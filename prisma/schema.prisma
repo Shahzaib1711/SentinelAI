@@ -1,0 +1,242 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ThreatLevel {
+  low
+  medium
+  high
+  critical
+}
+
+enum IncidentStatus {
+  open
+  investigating
+  resolved
+  escalated
+}
+
+enum MarkerType {
+  camera
+  entrance
+  exit
+  guard
+  restricted
+  vip_route
+}
+
+enum CameraStatus {
+  online
+  offline
+  maintenance
+}
+
+enum UserRole {
+  director
+  operator
+  analyst
+  admin
+}
+
+enum RecommendationType {
+  camera
+  guard
+  entrance
+  general
+}
+
+model User {
+  id          String   @id @default(cuid())
+  firebaseUid String   @unique
+  email       String   @unique
+  name        String
+  role        UserRole @default(operator)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Event {
+  id                 String   @id @default(cuid())
+  slug               String   @unique
+  name               String
+  venueName          String
+  eventDate          DateTime
+  threatLevel        ThreatLevel @default(medium)
+  securityScore      Int      @default(87)
+  vipCount           Int      @default(0)
+  attendees          Int      @default(0)
+  securityPersonnel  Int      @default(0)
+  threatTrendJson    Json?
+  riskDistributionJson Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  venue       Venue?
+  cameras     Camera[]
+  incidents   Incident[]
+  alerts      Alert[]
+  activeThreats ActiveThreat[]
+  timelineEvents TimelineEvent[]
+  riskZones   RiskZone[]
+  routes      Route[]
+  recommendations Recommendation[]
+}
+
+model Venue {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name      String
+  floorLevel String  @default("L1")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  blueprints Blueprint[]
+}
+
+model Blueprint {
+  id           String   @id @default(cuid())
+  venueId      String
+  venue        Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  name         String
+  type         String   @default("floor_plan")
+  storageUrl   String?
+  firebasePath String?
+  coveragePct  Int      @default(0)
+  vulnerabilityScore Int @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  markers    BlueprintMarker[]
+  blindSpots BlindSpot[]
+}
+
+model BlueprintMarker {
+  id          String     @id @default(cuid())
+  blueprintId String
+  blueprint   Blueprint  @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+  type        MarkerType
+  x           Float
+  y           Float
+  label       String
+  createdAt   DateTime   @default(now())
+}
+
+model BlindSpot {
+  id          String      @id @default(cuid())
+  blueprintId String
+  blueprint   Blueprint   @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  severity    ThreatLevel
+  description String
+}
+
+model Camera {
+  id         String       @id
+  eventId    String
+  event      Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name       String
+  location   String
+  status     CameraStatus @default(offline)
+  coverage   Int          @default(0)
+  useWebRTC  Boolean      @default(false)
+  streamUrl  String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  incidents Incident[]
+}
+
+model Incident {
+  id          String         @id
+  eventId     String
+  event       Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  time        DateTime
+  location    String
+  threatLevel ThreatLevel
+  status      IncidentStatus
+  description String
+  assignedTo  String
+  cameraId    String?
+  camera      Camera?        @relation(fields: [cameraId], references: [id])
+  resolution  String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model Alert {
+  id           String      @id @default(cuid())
+  eventId      String
+  event        Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  level        ThreatLevel
+  location     String
+  timestamp    DateTime
+  acknowledged Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+}
+
+model ActiveThreat {
+  id         String      @id @default(cuid())
+  eventId    String
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  externalId String
+  type       String
+  location   String
+  level      ThreatLevel
+  detectedAt DateTime
+  confidence Int
+}
+
+model TimelineEvent {
+  id          String      @id @default(cuid())
+  eventId     String
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  time        String
+  title       String
+  level       ThreatLevel
+  description String
+}
+
+model RiskZone {
+  id         String      @id @default(cuid())
+  eventId    String
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name       String
+  riskLevel  ThreatLevel
+  riskScore  Int
+  incidents  Int
+  coverage   Int
+}
+
+model Route {
+  id            String  @id
+  eventId       String
+  event         Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name          String
+  distance      String
+  estimatedTime String
+  riskScore     Int
+  waypointsJson Json
+  isSafest      Boolean @default(false)
+}
+
+model Recommendation {
+  id          String             @id @default(cuid())
+  eventId     String
+  event       Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  type        RecommendationType
+  title       String
+  description String
+  priority    ThreatLevel
+  location    String?
+}

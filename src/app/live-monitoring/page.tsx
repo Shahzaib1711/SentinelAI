@@ -1,0 +1,245 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { CameraCard, CameraFeedLightbox } from "@/components/shared/CameraCard";
+import { CameraFeedLinks } from "@/components/shared/CameraFeedLinks";
+import { AlertList } from "@/components/shared/AlertCard";
+import { LiveThreatIndicator } from "@/components/shared/ThreatCard";
+import { PageHeader, LoadingState } from "@/components/shared/PageElements";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { api } from "@/lib/api-client";
+import {
+  cameras as mockCameras,
+  recentAlerts as mockAlerts,
+  threatTimeline,
+  liveDetections,
+  dashboardKPIs,
+} from "@/lib/mock-data";
+import type { Alert, Camera, ThreatLevel } from "@/types";
+import { cn, getThreatBgColor, getThreatColor, getThreatDotColor } from "@/lib/utils";
+
+export default function LiveMonitoringPage() {
+  const [cameras, setCameras] = useState<Camera[]>(mockCameras);
+  const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
+  const [threatLevel, setThreatLevel] = useState<ThreatLevel>(dashboardKPIs.threatLevel);
+  const [loading, setLoading] = useState(true);
+  const [dataSource, setDataSource] = useState<"api" | "mock">("mock");
+  const [expandedCameras, setExpandedCameras] = useState<Camera[]>([]);
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedCameraIds, setSelectedCameraIds] = useState<string[]>([]);
+
+  const MAX_COMPARE = 4;
+  const feedCameras = cameras.filter((c) => c.status === "online").slice(0, 6);
+
+  const toggleCompareMode = () => {
+    setCompareMode((on) => {
+      if (on) setSelectedCameraIds([]);
+      return !on;
+    });
+  };
+
+  const handleFeedClick = (camera: Camera) => {
+    if (compareMode) {
+      setSelectedCameraIds((prev) => {
+        if (prev.includes(camera.id)) {
+          return prev.filter((id) => id !== camera.id);
+        }
+        if (prev.length >= MAX_COMPARE) return prev;
+        return [...prev, camera.id];
+      });
+      return;
+    }
+    setExpandedCameras([camera]);
+  };
+
+  const maximizeSelected = () => {
+    const selected = feedCameras.filter((c) => selectedCameraIds.includes(c.id));
+    if (selected.length >= 2) {
+      setExpandedCameras(selected);
+    }
+  };
+
+  const removeExpandedCamera = (cameraId: string) => {
+    setExpandedCameras((prev) => {
+      const next = prev.filter((c) => c.id !== cameraId);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [camRes, alertRes, dashRes] = await Promise.all([
+          api.cameras(),
+          api.alerts(undefined, true),
+          api.dashboard(),
+        ]);
+        setCameras(camRes.cameras);
+        setAlerts(alertRes.alerts);
+        setThreatLevel(dashRes.kpis.threatLevel as ThreatLevel);
+        setDataSource("api");
+      } catch {
+        setDataSource("mock");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <AppLayout title="Live Monitoring" subtitle="Phase 2 — Real-time event security monitoring">
+        <LoadingState message="Loading monitoring data..." />
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout
+      title="Live Monitoring"
+      subtitle={`Phase 2 — Real-time event security monitoring · ${dataSource === "api" ? "PostgreSQL" : "Mock data"}`}
+    >
+      <PageHeader
+        title="Live Event Monitoring"
+        description="Live camera feeds with YOLO object detection on phone streams"
+        action={<LiveThreatIndicator level={threatLevel} />}
+      />
+
+      <CameraFeedLinks cameras={feedCameras} className="mb-6" />
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
+        <div className="xl:col-span-3">
+          <Card className="soc-panel soc-glow-border">
+            <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                Camera Feed Grid
+              </CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant={compareMode ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={toggleCompareMode}
+                >
+                  {compareMode ? "Compare on" : "Compare feeds"}
+                </Button>
+                {compareMode && (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 text-xs"
+                      disabled={selectedCameraIds.length < 2}
+                      onClick={maximizeSelected}
+                    >
+                      Maximize ({selectedCameraIds.length})
+                    </Button>
+                    <span className="text-[10px] text-muted-foreground">
+                      Select 2–{MAX_COMPARE} feeds
+                    </span>
+                  </>
+                )}
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                  <span className="font-mono text-xs text-red-400">LIVE</span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {feedCameras.map((camera, i) => (
+                  <motion.div
+                    key={camera.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <CameraCard
+                      camera={camera}
+                      showFeed
+                      showBroadcastLink
+                      compareMode={compareMode}
+                      isSelected={selectedCameraIds.includes(camera.id)}
+                      detections={liveDetections.filter((d) => d.cameraId === camera.id)}
+                      onFeedClick={() => handleFeedClick(camera)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card className="soc-panel">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                Active Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[280px]">
+                <AlertList alerts={alerts} compact />
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card className="soc-panel">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                Threat Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[320px]">
+                <div className="relative space-y-0">
+                  <div className="absolute bottom-0 left-[7px] top-0 w-px bg-border/60" />
+                  {threatTimeline.map((event, i) => (
+                    <motion.div
+                      key={event.id}
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="relative flex gap-3 pb-4"
+                    >
+                      <div
+                        className={cn(
+                          "relative z-10 mt-1 h-3.5 w-3.5 shrink-0 rounded-full border-2 border-background",
+                          getThreatDotColor(event.level)
+                        )}
+                      />
+                      <div className={cn("flex-1 rounded-lg border p-2.5", getThreatBgColor(event.level))}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-muted-foreground">{event.time}</span>
+                          <span className={cn("text-[10px] font-medium uppercase", getThreatColor(event.level))}>
+                            {event.level}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs font-medium">{event.title}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{event.description}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <CameraFeedLightbox
+        cameras={expandedCameras}
+        getDetections={(cameraId) =>
+          liveDetections.filter((d) => d.cameraId === cameraId)
+        }
+        onClose={() => setExpandedCameras([])}
+        onRemoveCamera={removeExpandedCamera}
+      />
+    </AppLayout>
+  );
+}

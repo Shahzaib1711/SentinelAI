@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentinelai-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel_dev
+      POSTGRES_DB: sentinelai
+    volumes:
+      - sentinelai_pg_data:/var/lib/postgresql/data
+
+volumes:
+  sentinelai_pg_data:
