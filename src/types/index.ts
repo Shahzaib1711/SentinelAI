@@ -109,7 +109,9 @@ export interface TimelineEvent {
   description: string;
 }
 
-export type DetectionType = "person" | "vehicle" | "bag" | "animal";
+export type DetectionType = "person" | "vehicle" | "bag" | "animal" | "guard" | "vip";
+
+export type PersonRole = "guard" | "vip" | "visitor" | "restricted" | "entrance";
 
 export interface Detection {
   id: string;
@@ -121,6 +123,49 @@ export interface Detection {
   y: number;
   width?: number;
   height?: number;
+  /** Guard / VIP classification from zone + posture analysis */
+  role?: PersonRole;
+  trackId?: number;
+  zone?: string;
+  posture?: "standing" | "moving";
+  standing?: boolean;
+  blueprintX?: number;
+  blueprintY?: number;
+  cameraLocation?: string;
+  enrolledPersonId?: string | null;
+  enrolledName?: string | null;
+  designation?: string | null;
+  identified?: boolean;
+  faceMatchScore?: number | null;
+}
+
+export interface LivePersonnel {
+  id: string;
+  trackId: number;
+  role: PersonRole;
+  label: string;
+  zone: string;
+  posture: string;
+  confidence: number;
+  cameraId: string;
+  cameraLocation: string;
+  blueprintX: number;
+  blueprintY: number;
+  frameX: number;
+  frameY: number;
+  enrolledPersonId?: string | null;
+  enrolledName?: string | null;
+  designation?: string | null;
+  identified?: boolean;
+  faceMatchScore?: number | null;
+}
+
+export interface PersonnelSummary {
+  total: number;
+  guards: number;
+  vips: number;
+  visitors: number;
+  updatedAt: number;
 }
 
 export interface CoverageArea {

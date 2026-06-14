@@ -20,6 +20,7 @@ class WebRTCRoom:
     latest_detections: list[dict[str, Any]] = field(default_factory=list)
     detections_updated_at: int = 0
     last_detection_run_at: int = 0
+    latest_personnel: list[dict[str, Any]] = field(default_factory=list)
 
 
 _rooms: dict[str, WebRTCRoom] = {}
@@ -66,4 +67,5 @@ def room_state(camera_id: str, now: int) -> dict[str, Any]:
         "frameUpdatedAt": room.frame_updated_at,
         "detections": room.latest_detections,
         "detectionsUpdatedAt": room.detections_updated_at,
+        "personnel": room.latest_personnel,
     }

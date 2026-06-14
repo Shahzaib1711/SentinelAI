@@ -3,8 +3,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import select
+
 from app.config import settings
-from app.routers import alerts, events, health, incidents, webrtc
+from app.database import SessionLocal
+from app.models.models import Event
+from app.routers import alerts, events, health, incidents, personnel, webrtc
+from app.services.enrollment_gallery import reload_gallery_for_event, set_default_event_id
+from app.services.face_recognition import ensure_models
 from app.services.yolo_detector import preload_model
 
 
@@ -12,6 +18,20 @@ from app.services.yolo_detector import preload_model
 async def lifespan(_app: FastAPI):
     if settings.yolo_enabled:
         preload_model(settings.yolo_model)
+    try:
+        ensure_models()
+        async with SessionLocal() as db:
+            result = await db.execute(
+                select(Event).where(Event.slug == settings.default_event_slug)
+            )
+            event = result.scalar_one_or_none()
+            if event:
+                await reload_gallery_for_event(db, event.id)
+                set_default_event_id(event.id)
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning("Enrollment gallery preload skipped: %s", exc)
     yield
 
 
@@ -35,6 +55,7 @@ app.include_router(events.router)
 app.include_router(incidents.router)
 app.include_router(alerts.router)
 app.include_router(webrtc.router)
+app.include_router(personnel.router)
 
 
 @app.get("/")

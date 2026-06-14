@@ -16,6 +16,7 @@ import {
   Radio,
   Shield,
   Target,
+  UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/venue-setup", label: "Venue Setup", icon: Map },
   { href: "/coverage-analysis", label: "Coverage Analysis", icon: Target },
   { href: "/route-planning", label: "Route Planning", icon: MapPin },
+  { href: "/personnel-registry", label: "Personnel Registry", icon: UserCheck },
   { href: "/live-monitoring", label: "Live Monitoring", icon: Radio },
   { href: "/threat-intelligence", label: "Threat Intelligence", icon: Activity },
   { href: "/incident-center", label: "Incident Center", icon: AlertTriangle },

@@ -52,12 +52,20 @@ class RecommendationType(str, enum.Enum):
     general = "general"
 
 
+class PersonnelRole(str, enum.Enum):
+    guard = "guard"
+    vip = "vip"
+    staff = "staff"
+    contractor = "contractor"
+
+
 ThreatLevelEnum = ENUM(ThreatLevel, name="ThreatLevel", create_type=False)
 IncidentStatusEnum = ENUM(IncidentStatus, name="IncidentStatus", create_type=False)
 MarkerTypeEnum = ENUM(MarkerType, name="MarkerType", create_type=False)
 CameraStatusEnum = ENUM(CameraStatus, name="CameraStatus", create_type=False)
 UserRoleEnum = ENUM(UserRole, name="UserRole", create_type=False)
 RecommendationTypeEnum = ENUM(RecommendationType, name="RecommendationType", create_type=False)
+PersonnelRoleEnum = ENUM(PersonnelRole, name="PersonnelRole", create_type=False)
 
 
 class User(Base):
@@ -69,7 +77,12 @@ class User(Base):
     name: Mapped[str] = mapped_column(String)
     role: Mapped[UserRole] = mapped_column(UserRoleEnum, default=UserRole.operator)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updatedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 class Event(Base):
@@ -88,7 +101,12 @@ class Event(Base):
     threatTrendJson: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
     riskDistributionJson: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updatedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
     venue: Mapped["Venue | None"] = relationship(back_populates="event", uselist=False)
     cameras: Mapped[list["Camera"]] = relationship(back_populates="event")
@@ -99,6 +117,7 @@ class Event(Base):
     riskZones: Mapped[list["RiskZone"]] = relationship(back_populates="event")
     routes: Mapped[list["Route"]] = relationship(back_populates="event")
     recommendations: Mapped[list["Recommendation"]] = relationship(back_populates="event")
+    enrolledPersonnel: Mapped[list["EnrolledPerson"]] = relationship(back_populates="event")
 
 
 class Venue(Base):
@@ -109,7 +128,12 @@ class Venue(Base):
     name: Mapped[str] = mapped_column(String)
     floorLevel: Mapped[str] = mapped_column(String, default="L1")
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updatedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
     event: Mapped["Event"] = relationship(back_populates="venue")
     blueprints: Mapped[list["Blueprint"]] = relationship(back_populates="venue")
@@ -127,7 +151,12 @@ class Blueprint(Base):
     coveragePct: Mapped[int] = mapped_column(Integer, default=0)
     vulnerabilityScore: Mapped[int] = mapped_column(Integer, default=0)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updatedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
     venue: Mapped["Venue"] = relationship(back_populates="blueprints")
     markers: Mapped[list["BlueprintMarker"]] = relationship(back_populates="blueprint")
@@ -175,7 +204,12 @@ class Camera(Base):
     useWebRTC: Mapped[bool] = mapped_column(Boolean, default=False)
     streamUrl: Mapped[str | None] = mapped_column(String, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updatedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
     event: Mapped["Event"] = relationship(back_populates="cameras")
     incidents: Mapped[list["Incident"]] = relationship(back_populates="camera")
@@ -195,7 +229,12 @@ class Incident(Base):
     cameraId: Mapped[str | None] = mapped_column(String, ForeignKey("Camera.id"), nullable=True)
     resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updatedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
     event: Mapped["Event"] = relationship(back_populates="incidents")
     camera: Mapped["Camera | None"] = relationship(back_populates="incidents")
@@ -286,3 +325,25 @@ class Recommendation(Base):
     location: Mapped[str | None] = mapped_column(String, nullable=True)
 
     event: Mapped["Event"] = relationship(back_populates="recommendations")
+
+
+class EnrolledPerson(Base):
+    __tablename__ = "EnrolledPerson"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    eventId: Mapped[str] = mapped_column(String, ForeignKey("Event.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String)
+    designation: Mapped[str] = mapped_column(String)
+    role: Mapped[PersonnelRole] = mapped_column(PersonnelRoleEnum)
+    photoUrl: Mapped[str | None] = mapped_column(Text, nullable=True)
+    embeddingJson: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updatedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
+
+    event: Mapped["Event"] = relationship(back_populates="enrolledPersonnel")

@@ -57,21 +57,25 @@ def preload_model(model_name: str) -> None:
         logger.warning("YOLO preload skipped: %s", exc)
 
 
-def detect_frame_data_url(
-    data_url: str,
+def decode_frame_data_url(data_url: str):
+    """Decode JPEG data-URL to BGR numpy image."""
+    import cv2
+    import numpy as np
+
+    payload = data_url.split(",", 1)[1] if "," in data_url else data_url
+    raw = base64.b64decode(payload)
+    arr = np.frombuffer(raw, dtype=np.uint8)
+    return cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
+
+def detect_frame(
+    img,
     *,
     model_name: str = "yolov8n.pt",
     confidence: float = 0.4,
 ) -> list[dict[str, Any]]:
-    """Run YOLO on a JPEG data-URL and return normalized bounding boxes."""
+    """Run YOLO on a BGR image and return normalized bounding boxes."""
     try:
-        import cv2
-        import numpy as np
-
-        payload = data_url.split(",", 1)[1] if "," in data_url else data_url
-        raw = base64.b64decode(payload)
-        arr = np.frombuffer(raw, dtype=np.uint8)
-        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if img is None:
             return []
 
@@ -112,6 +116,21 @@ def detect_frame_data_url(
             )
 
         return detections
+    except Exception as exc:
+        logger.warning("YOLO detection failed: %s", exc)
+        return []
+
+
+def detect_frame_data_url(
+    data_url: str,
+    *,
+    model_name: str = "yolov8n.pt",
+    confidence: float = 0.4,
+) -> list[dict[str, Any]]:
+    """Run YOLO on a JPEG data-URL and return normalized bounding boxes."""
+    try:
+        img = decode_frame_data_url(data_url)
+        return detect_frame(img, model_name=model_name, confidence=confidence)
     except Exception as exc:
         logger.warning("YOLO detection failed: %s", exc)
         return []

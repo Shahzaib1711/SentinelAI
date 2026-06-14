@@ -50,6 +50,13 @@ enum RecommendationType {
   general
 }
 
+enum PersonnelRole {
+  guard
+  vip
+  staff
+  contractor
+}
+
 model User {
   id          String   @id @default(cuid())
   firebaseUid String   @unique
@@ -57,7 +64,7 @@ model User {
   name        String
   role        UserRole @default(operator)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime @default(now()) @updatedAt
 }
 
 model Event {
@@ -74,7 +81,7 @@ model Event {
   threatTrendJson    Json?
   riskDistributionJson Json?
   createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  updatedAt          DateTime @default(now()) @updatedAt
 
   venue       Venue?
   cameras     Camera[]
@@ -85,6 +92,21 @@ model Event {
   riskZones   RiskZone[]
   routes      Route[]
   recommendations Recommendation[]
+  enrolledPersonnel EnrolledPerson[]
+}
+
+model EnrolledPerson {
+  id            String         @id @default(cuid())
+  eventId       String
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name          String
+  designation   String
+  role          PersonnelRole
+  photoUrl      String?
+  embeddingJson Json?
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
 }
 
 model Venue {
@@ -94,7 +116,7 @@ model Venue {
   name      String
   floorLevel String  @default("L1")
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   blueprints Blueprint[]
 }
@@ -110,7 +132,7 @@ model Blueprint {
   coveragePct  Int      @default(0)
   vulnerabilityScore Int @default(0)
   createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime @default(now()) @updatedAt
 
   markers    BlueprintMarker[]
   blindSpots BlindSpot[]
@@ -150,7 +172,7 @@ model Camera {
   useWebRTC  Boolean      @default(false)
   streamUrl  String?
   createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  updatedAt  DateTime     @default(now()) @updatedAt
 
   incidents Incident[]
 }
@@ -169,7 +191,7 @@ model Incident {
   camera      Camera?        @relation(fields: [cameraId], references: [id])
   resolution  String?
   createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  updatedAt   DateTime       @default(now()) @updatedAt
 }
 
 model Alert {

@@ -7,7 +7,9 @@ from fastapi import APIRouter, HTTPException
 
 from app.config import settings
 from app.services.signaling import get_room, reset_room, room_state
-from app.services.yolo_detector import detect_frame_data_url
+from app.services.person_identifier import enrich_person_detections
+from app.services.personnel_store import clear_camera_personnel, update_camera_personnel
+from app.services.yolo_detector import decode_frame_data_url, detect_frame
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +29,25 @@ async def _run_detection(camera_id: str, frame: str) -> None:
 
     try:
         loop = asyncio.get_running_loop()
-        detections = await loop.run_in_executor(
-            _executor,
-            lambda: detect_frame_data_url(
-                frame,
+        def _detect_and_identify() -> tuple[list, list]:
+            img = decode_frame_data_url(frame)
+            raw_detections = detect_frame(
+                img,
                 model_name=settings.yolo_model,
                 confidence=settings.yolo_confidence,
-            ),
-        )
-        room.latest_detections = detections
+            )
+            return enrich_person_detections(
+                camera_id,
+                raw_detections,
+                frame_bgr=img,
+            )
+
+        enriched, personnel = await loop.run_in_executor(_executor, _detect_and_identify)
+        room.latest_detections = enriched
+        room.latest_personnel = personnel
         room.detections_updated_at = now
         room.last_detection_run_at = now
+        update_camera_personnel(camera_id, personnel)
     except Exception as exc:
         logger.warning("Detection task failed for %s: %s", camera_id, exc)
     finally:
@@ -71,6 +81,7 @@ async def post_webrtc_signal(camera_id: str, body: dict):
         room.latest_detections = []
         room.detections_updated_at = 0
         room.last_detection_run_at = 0
+        clear_camera_personnel(camera_id)
         return {"ok": True}
 
     if action == "viewer-register":
@@ -127,6 +138,8 @@ async def post_webrtc_signal(camera_id: str, body: dict):
     if action == "disconnect":
         reset_room(camera_id, body.get("sessionId"), body.get("role"))
         _detection_busy.pop(camera_id, None)
+        if body.get("role") == "broadcaster":
+            clear_camera_personnel(camera_id)
         return {"ok": True}
 
     raise HTTPException(status_code=400, detail="Unknown action")

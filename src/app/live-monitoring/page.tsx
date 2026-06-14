@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CameraCard, CameraFeedLightbox } from "@/components/shared/CameraCard";
 import { CameraFeedLinks } from "@/components/shared/CameraFeedLinks";
+import { PersonnelFloorMap } from "@/components/shared/PersonnelFloorMap";
+import { useLivePersonnel } from "@/hooks/useLivePersonnel";
 import { AlertList } from "@/components/shared/AlertCard";
 import { LiveThreatIndicator } from "@/components/shared/ThreatCard";
 import { PageHeader, LoadingState } from "@/components/shared/PageElements";
@@ -34,6 +36,7 @@ export default function LiveMonitoringPage() {
 
   const MAX_COMPARE = 4;
   const feedCameras = cameras.filter((c) => c.status === "online").slice(0, 6);
+  const { personnel, summary: personnelSummary } = useLivePersonnel(1000);
 
   const toggleCompareMode = () => {
     setCompareMode((on) => {
@@ -105,11 +108,30 @@ export default function LiveMonitoringPage() {
     >
       <PageHeader
         title="Live Event Monitoring"
-        description="Live camera feeds with YOLO object detection on phone streams"
+        description="YOLO person detection with guard/VIP zone identification and live floor-map tracking"
         action={<LiveThreatIndicator level={threatLevel} />}
       />
 
       <CameraFeedLinks cameras={feedCameras} className="mb-6" />
+
+      <Card className="soc-panel mb-6">
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div>
+            <CardTitle className="text-sm">Personnel Identification</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Face-matched staff from Personnel Registry — standing persons mapped to floor plan
+            </p>
+          </div>
+          <div className="flex gap-3 font-mono text-[10px]">
+            <span className="text-purple-400">{personnelSummary.guards} guards</span>
+            <span className="text-yellow-400">{personnelSummary.vips} VIPs</span>
+            <span className="text-cyan-400">{personnelSummary.visitors} visitors</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <PersonnelFloorMap personnel={personnel} />
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
         <div className="xl:col-span-3">

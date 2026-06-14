@@ -8,6 +8,16 @@ const TYPE_STYLES: Record<
   DetectionType,
   { border: string; bg: string; label: string }
 > = {
+  guard: {
+    border: "border-purple-400",
+    bg: "bg-purple-400/15",
+    label: "bg-purple-500/95 text-white",
+  },
+  vip: {
+    border: "border-yellow-400",
+    bg: "bg-yellow-400/15",
+    label: "bg-yellow-500/95 text-black",
+  },
   person: {
     border: "border-cyan-400",
     bg: "bg-cyan-400/10",
@@ -41,7 +51,16 @@ export function DetectionOverlay({ detections, className }: DetectionOverlayProp
   return (
     <div className={cn("pointer-events-none absolute inset-0 z-10", className)}>
       {detections.map((det) => {
-        const style = TYPE_STYLES[det.type] ?? TYPE_STYLES.person;
+        const roleStyle =
+          det.role === "guard"
+            ? TYPE_STYLES.guard
+            : det.role === "vip"
+              ? TYPE_STYLES.vip
+              : null;
+        const style = roleStyle ?? TYPE_STYLES[det.type] ?? TYPE_STYLES.person;
+        const subtitle = [det.zone, det.posture === "standing" ? "Standing" : null]
+          .filter(Boolean)
+          .join(" · ");
 
         return (
           <motion.div
@@ -64,6 +83,11 @@ export function DetectionOverlay({ detections, className }: DetectionOverlayProp
             >
               {det.label} {det.confidence}%
             </span>
+            {subtitle && (
+              <span className="absolute -bottom-4 left-0 whitespace-nowrap text-[8px] text-white/80">
+                {subtitle}
+              </span>
+            )}
           </motion.div>
         );
       })}

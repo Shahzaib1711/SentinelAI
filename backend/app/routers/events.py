@@ -20,6 +20,7 @@ from app.models.models import (
 from app.services.mappers import map_alert, map_camera, map_incident, map_marker_type, to_db_marker_type
 from app.services.blueprint_analyzer import analyze_blueprint_image
 from app.services.coverage_engine import analyze_coverage
+from app.services.personnel_store import get_all_personnel, get_personnel_summary
 import uuid
 
 router = APIRouter(prefix="/api/v1/events", tags=["events"])
@@ -351,4 +352,13 @@ async def analyze_event_coverage(slug: str, db: AsyncSession = Depends(get_db)):
             }
             for r in recommendations
         ],
+    }
+
+
+@router.get("/{slug}/personnel/live")
+async def get_live_personnel(slug: str, db: AsyncSession = Depends(get_db)):
+    await _get_event(db, slug)
+    return {
+        "summary": get_personnel_summary(),
+        "personnel": get_all_personnel(),
     }
