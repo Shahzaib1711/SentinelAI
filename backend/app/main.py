@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,13 +12,33 @@ from app.models.models import Event
 from app.routers import alerts, events, health, incidents, personnel, webrtc
 from app.services.enrollment_gallery import reload_gallery_for_event, set_default_event_id
 from app.services.face_recognition import ensure_models
+from app.services.blueprint_detector import blueprint_model_status, preload_blueprint_model
 from app.services.yolo_detector import preload_model
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s %(name)s: %(message)s",
+)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if settings.yolo_enabled:
         preload_model(settings.yolo_model)
+    if settings.blueprint_ml_enabled:
+        loaded = preload_blueprint_model(settings.blueprint_ml_model)
+        status = blueprint_model_status()
+        if loaded:
+            print(
+                f"[SentinelAI] Blueprint ML ready: {status.get('resolvedPath')}",
+                flush=True,
+            )
+        else:
+            print(
+                "[SentinelAI] Blueprint ML not loaded — auto-detect will use OpenCV. "
+                "Run: npm run ml:blueprint:deploy",
+                flush=True,
+            )
     try:
         ensure_models()
         async with SessionLocal() as db:

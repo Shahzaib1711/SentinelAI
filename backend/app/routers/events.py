@@ -20,7 +20,7 @@ from app.models.models import (
 from app.services.mappers import map_alert, map_camera, map_incident, map_marker_type, to_db_marker_type
 from app.services.blueprint_analyzer import analyze_blueprint_image
 from app.services.coverage_engine import analyze_coverage
-from app.services.personnel_store import get_all_personnel, get_personnel_summary
+from app.services.route_advisor import advise_routes
 import uuid
 
 router = APIRouter(prefix="/api/v1/events", tags=["events"])
@@ -225,7 +225,12 @@ async def update_blueprint(slug: str, body: dict, db: AsyncSession = Depends(get
             )
 
         await db.commit()
-        return {"ok": True, "markers": saved, "summary": result.get("summary", {})}
+        return {
+            "ok": True,
+            "markers": saved,
+            "layout": result.get("layout", {}),
+            "summary": result.get("summary", {}),
+        }
 
     if action == "add-marker":
         marker = BlueprintMarker(
@@ -362,3 +367,77 @@ async def get_live_personnel(slug: str, db: AsyncSession = Depends(get_db)):
         "summary": get_personnel_summary(),
         "personnel": get_all_personnel(),
     }
+
+
+@router.get("/{slug}/routes/advise")
+async def advise_event_routes(
+    slug: str,
+    start: str,
+    destination: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Suggest escort routes from detected blueprint markers and event context."""
+    result = await db.execute(
+        select(Event)
+        .where(Event.slug == slug)
+        .options(
+            selectinload(Event.venue).selectinload(Venue.blueprints).selectinload(Blueprint.markers),
+            selectinload(Event.venue).selectinload(Venue.blueprints).selectinload(Blueprint.blindSpots),
+        )
+    )
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    venue = event.venue
+    if not venue or not venue.blueprints:
+        raise HTTPException(status_code=404, detail="Blueprint not found")
+
+    bp = sorted(venue.blueprints, key=lambda b: b.createdAt, reverse=True)[0]
+    markers = [
+        {
+            "id": m.id,
+            "type": map_marker_type(m.type),
+            "x": m.x,
+            "y": m.y,
+            "label": m.label,
+        }
+        for m in bp.markers
+        if map_marker_type(m.type) != "vip-route"
+    ]
+    blind_spots = [
+        {
+            "x": b.x,
+            "y": b.y,
+            "width": b.width,
+            "height": b.height,
+            "severity": b.severity.value,
+            "description": b.description,
+        }
+        for b in bp.blindSpots
+    ]
+
+    if not markers:
+        raise HTTPException(
+            status_code=400,
+            detail="No blueprint markers found. Upload a floor plan in Venue Setup and run auto-detect.",
+        )
+
+    advice = advise_routes(
+        markers=markers,
+        blind_spots=blind_spots,
+        event={
+            "name": event.name,
+            "threatLevel": event.threatLevel.value,
+            "vipCount": event.vipCount,
+            "attendees": event.attendees,
+            "securityPersonnel": event.securityPersonnel,
+        },
+        start_marker_id=start,
+        destination_marker_id=destination,
+    )
+
+    if advice.get("error"):
+        raise HTTPException(status_code=400, detail=advice["error"])
+
+    return advice

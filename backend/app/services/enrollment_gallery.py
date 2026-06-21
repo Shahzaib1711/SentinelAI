@@ -66,6 +66,28 @@ def add_to_gallery(event_id: str, record: EnrolledRecord) -> None:
     gallery.append(record)
 
 
+def update_gallery_record(
+    event_id: str,
+    person_id: str,
+    *,
+    name: str | None = None,
+    designation: str | None = None,
+    role: str | None = None,
+) -> bool:
+    gallery = get_gallery(event_id)
+    for record in gallery:
+        if record.id != person_id:
+            continue
+        if name is not None:
+            record.name = name
+        if designation is not None:
+            record.designation = designation
+        if role is not None:
+            record.role = role
+        return True
+    return False
+
+
 def remove_from_gallery(event_id: str, person_id: str) -> None:
     gallery = _gallery_by_event.get(event_id, [])
     _gallery_by_event[event_id] = [r for r in gallery if r.id != person_id]

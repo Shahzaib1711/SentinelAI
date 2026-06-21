@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import {
   Ban,
   Camera,
-  Crown,
   DoorOpen,
   FileImage,
   Loader2,
@@ -23,7 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { blueprintApi } from "@/lib/api/blueprint";
 import { cn } from "@/lib/utils";
-import type { BlueprintMarker, MarkerType } from "@/types";
+import type { BlueprintLayout, BlueprintMarker, MarkerType } from "@/types";
 
 const tools: { type: MarkerType; label: string; icon: React.ElementType; color: string }[] = [
   { type: "camera", label: "Add Camera", icon: Camera, color: "text-cyan-400" },
@@ -31,7 +30,6 @@ const tools: { type: MarkerType; label: string; icon: React.ElementType; color: 
   { type: "exit", label: "Add Exit", icon: LogOut, color: "text-blue-400" },
   { type: "guard", label: "Add Guard Post", icon: Shield, color: "text-purple-400" },
   { type: "restricted", label: "Restricted Zone", icon: Ban, color: "text-red-400" },
-  { type: "vip-route", label: "VIP Route", icon: Crown, color: "text-yellow-400" },
 ];
 
 function nextMarkerLabel(type: MarkerType, markers: BlueprintMarker[]): string {
@@ -50,6 +48,7 @@ export default function VenueSetupPage() {
   const [blueprintName, setBlueprintName] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [markers, setMarkers] = useState<BlueprintMarker[]>([]);
+  const [layout, setLayout] = useState<BlueprintLayout | null>(null);
   const [activeTool, setActiveTool] = useState<MarkerType | null>(null);
   const [uploadType, setUploadType] = useState("Floor Plan");
   const [detectSummary, setDetectSummary] = useState<string | null>(null);
@@ -112,10 +111,24 @@ export default function VenueSetupPage() {
     try {
       const res = await blueprintApi.autoDetect(true, storageUrl);
       setMarkers(res.markers);
-      const cams = res.markers.filter((m) => m.type === "camera").length;
+      setLayout(res.layout ?? null);
+      const walls =
+        typeof res.summary?.wallCount === "number" ? res.summary.wallCount : res.layout?.walls?.length ?? 0;
+      const rooms =
+        typeof res.summary?.roomCount === "number" ? res.summary.roomCount : res.layout?.rooms?.length ?? 0;
       const entrances = res.markers.filter((m) => m.type === "entrance").length;
+      const method =
+        typeof res.summary?.method === "string"
+          ? res.summary.method.includes("ml_yolo")
+            ? "ML"
+            : "OpenCV"
+          : "auto";
+      const hint =
+        typeof res.summary?.hint === "string" && method === "OpenCV"
+          ? ` ${res.summary.hint}`
+          : "";
       setDetectSummary(
-        `Auto-detected ${res.markers.length} markers (${cams} cameras, ${entrances} entrances) using OpenCV`
+        `Detected ${walls} walls, ${rooms} rooms, ${entrances} entrance(s) via ${method} — add cameras and guards manually${hint}`
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Auto-detection failed");
@@ -187,7 +200,7 @@ export default function VenueSetupPage() {
     >
       <PageHeader
         title="Blueprint & Venue Configuration"
-        description="Upload a floor plan — OpenCV auto-detects cameras, entrances, VIP route, and zones"
+        description="Upload a floor plan — ML detects walls and splits rooms from layout. ROOM-01 labels are geometric zones (text on the drawing is not read yet)."
         action={
           <Button
             size="sm"
@@ -323,6 +336,14 @@ export default function VenueSetupPage() {
                   <span className="font-mono text-cyan-400">{markers.length}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Rooms (ML)</span>
+                  <span className="font-mono text-emerald-400">{layout?.rooms?.length ?? 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Walls (ML)</span>
+                  <span className="font-mono text-orange-400">{layout?.walls?.length ?? 0}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Cameras</span>
                   <span className="font-mono">{markers.filter((m) => m.type === "camera").length}</span>
                 </div>
@@ -370,6 +391,8 @@ export default function VenueSetupPage() {
             <CardContent>
               <BlueprintViewer
                 markers={markers}
+                layout={layout}
+                showLayout={Boolean(imageUrl)}
                 imageUrl={imageUrl}
                 floorLabel={`${floorLevel} · ${blueprintName || "Venue map"}`}
                 showFloorPlanSvg={!imageUrl}

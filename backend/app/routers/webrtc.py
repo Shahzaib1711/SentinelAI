@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.config import settings
 from app.services.signaling import get_room, reset_room, room_state
-from app.services.person_identifier import enrich_person_detections
+from app.services.person_identifier import clear_track_enrollment_for_camera, enrich_person_detections
 from app.services.personnel_store import clear_camera_personnel, update_camera_personnel
 from app.services.yolo_detector import decode_frame_data_url, detect_frame
 
@@ -30,6 +30,8 @@ async def _run_detection(camera_id: str, frame: str) -> None:
     try:
         loop = asyncio.get_running_loop()
         def _detect_and_identify() -> tuple[list, list]:
+            from app.services.enrollment_gallery import get_default_event_id
+
             img = decode_frame_data_url(frame)
             raw_detections = detect_frame(
                 img,
@@ -40,6 +42,7 @@ async def _run_detection(camera_id: str, frame: str) -> None:
                 camera_id,
                 raw_detections,
                 frame_bgr=img,
+                event_id=get_default_event_id(),
             )
 
         enriched, personnel = await loop.run_in_executor(_executor, _detect_and_identify)
@@ -140,6 +143,7 @@ async def post_webrtc_signal(camera_id: str, body: dict):
         _detection_busy.pop(camera_id, None)
         if body.get("role") == "broadcaster":
             clear_camera_personnel(camera_id)
+            clear_track_enrollment_for_camera(camera_id)
         return {"ok": True}
 
     raise HTTPException(status_code=400, detail="Unknown action")

@@ -70,4 +70,6 @@ export const api = {
 };
 
 export { blueprintApi } from "@/lib/api/blueprint";
+export { routesApi } from "@/lib/api/routes";
+export type { RouteAdvisoryResponse, RouteLocation } from "@/lib/api/routes";
 export type { BlueprintData, BlueprintResponse, CoverageAnalysisResult } from "@/lib/api/blueprint";

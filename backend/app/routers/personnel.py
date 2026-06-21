@@ -17,6 +17,7 @@ from app.services.enrollment_gallery import (
     reload_gallery_for_event,
     remove_from_gallery,
     set_default_event_id,
+    update_gallery_record,
 )
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,50 @@ async def enroll_person(slug: str, body: dict, db: AsyncSession = Depends(get_db
             photo_url=person.photoUrl,
             embedding=to_numpy_embedding(embedding_list),
         ),
+    )
+    set_default_event_id(event.id)
+
+    return {"ok": True, "person": _map_enrolled(person)}
+
+
+@router.patch("/{slug}/personnel/enrolled/{person_id}")
+async def update_enrolled(
+    person_id: str, slug: str, body: dict, db: AsyncSession = Depends(get_db)
+):
+    """Update enrolled person metadata (e.g. promote to VIP) for live recognition."""
+    event = await _get_event(db, slug)
+    result = await db.execute(
+        select(EnrolledPerson).where(
+            EnrolledPerson.id == person_id,
+            EnrolledPerson.eventId == event.id,
+        )
+    )
+    person = result.scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    if "name" in body and body["name"]:
+        person.name = str(body["name"]).strip()
+    if "designation" in body and body["designation"]:
+        person.designation = str(body["designation"]).strip()
+    if "role" in body and body["role"]:
+        try:
+            person.role = PersonnelRole(str(body["role"]).strip().lower())
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="Role must be guard, vip, staff, or contractor",
+            ) from exc
+
+    await db.commit()
+    await db.refresh(person)
+
+    update_gallery_record(
+        event.id,
+        person.id,
+        name=person.name,
+        designation=person.designation,
+        role=person.role.value,
     )
     set_default_event_id(event.id)
 

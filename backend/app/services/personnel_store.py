@@ -27,13 +27,28 @@ def get_all_personnel() -> list[dict[str, Any]]:
     return all_people
 
 
+def _unique_by_enrollment(people: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Count each enrolled person once; keep anonymous tracks per camera."""
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for p in people:
+        enrolled_id = p.get("enrolledPersonId")
+        if enrolled_id:
+            if enrolled_id in seen:
+                continue
+            seen.add(enrolled_id)
+        unique.append(p)
+    return unique
+
+
 def get_personnel_summary() -> dict[str, Any]:
     all_p = get_all_personnel()
-    guards = sum(1 for p in all_p if p.get("role") == "guard")
-    vips = sum(1 for p in all_p if p.get("role") == "vip")
-    visitors = sum(1 for p in all_p if p.get("role") == "visitor")
+    unique_p = _unique_by_enrollment(all_p)
+    guards = sum(1 for p in unique_p if p.get("role") == "guard")
+    vips = sum(1 for p in unique_p if p.get("role") == "vip")
+    visitors = sum(1 for p in unique_p if p.get("role") not in ("guard", "vip"))
     return {
-        "total": len(all_p),
+        "total": len(unique_p),
         "guards": guards,
         "vips": vips,
         "visitors": visitors,

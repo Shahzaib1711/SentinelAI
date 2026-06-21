@@ -12,7 +12,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Set DATABASE_URL to override, or use DB_* vars below.
+    # Neon: set DATABASE_URL from console.neon.tech (pooled). DIRECT_URL for Prisma migrations.
+    # Or use DB_* for local Docker Postgres.
     database_url: str | None = Field(default=None, validation_alias="DATABASE_URL")
     db_host: str = "localhost"
     db_port: int = 5432
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     db_password: str = ""
     db_name: str = "sentinelai"
     db_schema: str = "public"
+    db_sslmode: str | None = None  # require for Neon; disable for local Docker
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
@@ -36,16 +38,27 @@ class Settings(BaseSettings):
     face_match_threshold: float = 0.45  # env: FACE_MATCH_THRESHOLD
     default_event_id: str | None = None
 
+    blueprint_ml_enabled: bool = True
+    blueprint_ml_model: str = "backend/app/models/sentinel_blueprint.pt"
+    blueprint_ml_confidence: float = 0.10
+    blueprint_ml_imgsz: int = 1280
+
     @model_validator(mode="after")
     def build_database_url(self) -> Self:
-        if self.database_url:
+        if self.database_url and self.database_url.strip():
             return self
         user = quote_plus(self.db_user)
         password = quote_plus(self.db_password)
-        self.database_url = (
+        url = (
             f"postgresql+asyncpg://{user}:{password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
+        sslmode = self.db_sslmode
+        if not sslmode and "neon.tech" in self.db_host:
+            sslmode = "require"
+        if sslmode:
+            url = f"{url}?sslmode={sslmode}"
+        self.database_url = url
         return self
 
     @property

@@ -7,6 +7,7 @@ import { CameraCard, CameraFeedLightbox } from "@/components/shared/CameraCard";
 import { CameraFeedLinks } from "@/components/shared/CameraFeedLinks";
 import { PersonnelFloorMap } from "@/components/shared/PersonnelFloorMap";
 import { useLivePersonnel } from "@/hooks/useLivePersonnel";
+import { useMultiCameraRelayDetections } from "@/hooks/useMultiCameraRelayDetections";
 import { AlertList } from "@/components/shared/AlertCard";
 import { LiveThreatIndicator } from "@/components/shared/ThreatCard";
 import { PageHeader, LoadingState } from "@/components/shared/PageElements";
@@ -18,7 +19,6 @@ import {
   cameras as mockCameras,
   recentAlerts as mockAlerts,
   threatTimeline,
-  liveDetections,
   dashboardKPIs,
 } from "@/lib/mock-data";
 import type { Alert, Camera, ThreatLevel } from "@/types";
@@ -36,6 +36,8 @@ export default function LiveMonitoringPage() {
 
   const MAX_COMPARE = 4;
   const feedCameras = cameras.filter((c) => c.status === "online").slice(0, 6);
+  const feedCameraIds = feedCameras.map((c) => c.id);
+  const relayDetectionsByCamera = useMultiCameraRelayDetections(feedCameraIds);
   const { personnel, summary: personnelSummary } = useLivePersonnel(1000);
 
   const toggleCompareMode = () => {
@@ -187,7 +189,7 @@ export default function LiveMonitoringPage() {
                       showBroadcastLink
                       compareMode={compareMode}
                       isSelected={selectedCameraIds.includes(camera.id)}
-                      detections={liveDetections.filter((d) => d.cameraId === camera.id)}
+                      detections={relayDetectionsByCamera[camera.id] ?? []}
                       onFeedClick={() => handleFeedClick(camera)}
                     />
                   </motion.div>
@@ -256,9 +258,7 @@ export default function LiveMonitoringPage() {
 
       <CameraFeedLightbox
         cameras={expandedCameras}
-        getDetections={(cameraId) =>
-          liveDetections.filter((d) => d.cameraId === cameraId)
-        }
+        getDetections={(cameraId) => relayDetectionsByCamera[cameraId] ?? []}
         onClose={() => setExpandedCameras([])}
         onRemoveCamera={removeExpandedCamera}
       />

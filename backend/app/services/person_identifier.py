@@ -19,6 +19,7 @@ except ImportError:  # pragma: no cover
 
 # Per-camera simple centroid tracker
 _tracks: dict[str, dict[int, dict[str, float]]] = {}
+_track_enrollment: dict[str, dict[int, dict[str, Any]]] = {}
 _next_track_id: dict[str, int] = {}
 TRACK_MATCH_PCT = 10.0
 TRACK_STALE_MS = 4_000
@@ -34,10 +35,64 @@ _ROLE_LABELS = {
 _ROLE_TYPES = {
     "guard": "guard",
     "vip": "vip",
+    "staff": "person",
+    "contractor": "person",
     "restricted": "person",
     "entrance": "person",
     "visitor": "person",
 }
+
+
+def _role_badge(role: str) -> str:
+    return {
+        "vip": "VIP",
+        "guard": "Guard",
+        "staff": "Staff",
+        "contractor": "Contractor",
+    }.get(role, role.title())
+
+
+def _display_label(name: str, role: str, designation: str | None) -> str:
+    badge = _role_badge(role)
+    if designation:
+        return f"{name} · {designation} · {badge}"
+    return f"{name} · {badge}"
+
+
+def _get_track_enrollment(camera_id: str, track_id: int) -> dict[str, Any] | None:
+    return _track_enrollment.get(camera_id, {}).get(track_id)
+
+
+def _set_track_enrollment(
+    camera_id: str,
+    track_id: int,
+    *,
+    enrolled_id: str,
+    name: str,
+    designation: str,
+    role: str,
+    score: float,
+) -> None:
+    _track_enrollment.setdefault(camera_id, {})[track_id] = {
+        "enrolled_id": enrolled_id,
+        "name": name,
+        "designation": designation,
+        "role": role,
+        "score": score,
+    }
+
+
+def _clear_stale_track_enrollment(camera_id: str, stale_ids: list[int]) -> None:
+    bucket = _track_enrollment.get(camera_id)
+    if not bucket:
+        return
+    for tid in stale_ids:
+        bucket.pop(tid, None)
+
+
+def clear_track_enrollment_for_camera(camera_id: str) -> None:
+    """Drop sticky face-ID cache when a broadcaster disconnects."""
+    _track_enrollment.pop(camera_id, None)
 
 
 def _centroid(det: dict[str, Any]) -> tuple[float, float]:
@@ -73,6 +128,7 @@ def _assign_track_id(camera_id: str, cx: float, cy: float) -> int:
     stale = [tid for tid, t in tracks.items() if now - t["last_seen"] > TRACK_STALE_MS]
     for tid in stale:
         del tracks[tid]
+    _clear_stale_track_enrollment(camera_id, stale)
 
     best_id: int | None = None
     best_dist = TRACK_MATCH_PCT
@@ -148,12 +204,13 @@ def enrich_person_detections(
         )
 
         role = zone_role
-        role_label = _ROLE_LABELS.get(role, "Visitor")
         enrolled_id: str | None = None
         enrolled_name: str | None = None
         designation: str | None = None
         face_match_score = 0.0
+        identified = False
 
+        cached = _get_track_enrollment(camera_id, track_id)
         if frame_bgr is not None and resolve_event_id:
             match, face_match_score = identify_person_in_frame(
                 resolve_event_id,
@@ -168,18 +225,40 @@ def enrich_person_detections(
                 enrolled_name = match.name
                 designation = match.designation
                 role = match.role
-                role_label = match.name
+                identified = True
+                _set_track_enrollment(
+                    camera_id,
+                    track_id,
+                    enrolled_id=match.id,
+                    name=match.name,
+                    designation=match.designation or "",
+                    role=match.role,
+                    score=face_match_score,
+                )
+            elif cached:
+                enrolled_id = cached["enrolled_id"]
+                enrolled_name = cached["name"]
+                designation = cached.get("designation") or None
+                role = cached["role"]
+                face_match_score = float(cached.get("score", 0))
+                identified = True
 
-        track_suffix = "" if enrolled_name else f" #{track_id:02d}"
+        if identified and enrolled_name:
+            display_label = _display_label(enrolled_name, role, designation)
+        else:
+            track_suffix = f" #{track_id:02d}"
+            display_label = f"{_ROLE_LABELS.get(role, 'Visitor')}{track_suffix}"
+
         posture = "Standing" if standing else "Moving"
-        display_label = (
-            f"{enrolled_name} · {designation}"
-            if enrolled_name and designation
-            else f"{role_label}{track_suffix}"
+        det_id = (
+            f"{camera_id}-enrolled-{enrolled_id}"
+            if enrolled_id
+            else f"{camera_id}-track-{track_id}"
         )
 
         item = {
             **det,
+            "id": det_id,
             "type": _ROLE_TYPES.get(role, "person"),
             "role": role,
             "trackId": track_id,
@@ -195,7 +274,7 @@ def enrich_person_detections(
             "enrolledName": enrolled_name,
             "designation": designation,
             "faceMatchScore": round(face_match_score, 3) if face_match_score else None,
-            "identified": enrolled_id is not None,
+            "identified": identified,
         }
         enriched.append(item)
 
@@ -218,7 +297,7 @@ def enrich_person_detections(
                     "enrolledPersonId": enrolled_id,
                     "enrolledName": enrolled_name,
                     "designation": designation,
-                    "identified": enrolled_id is not None,
+                    "identified": identified,
                     "faceMatchScore": round(face_match_score, 3) if face_match_score else None,
                 }
             )

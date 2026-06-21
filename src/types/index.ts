@@ -18,6 +18,27 @@ export interface BlueprintMarker {
   label: string;
 }
 
+export interface BlueprintLayoutBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence?: number;
+}
+
+export interface BlueprintRoom extends BlueprintLayoutBox {
+  id: string;
+  label: string;
+  areaPct?: number;
+}
+
+export interface BlueprintLayout {
+  blueprintBounds?: BlueprintLayoutBox;
+  walls?: BlueprintLayoutBox[];
+  rooms?: BlueprintRoom[];
+  entrances?: { x: number; y: number; side?: string; label?: string }[];
+}
+
 export interface Alert {
   id: string;
   title: string;

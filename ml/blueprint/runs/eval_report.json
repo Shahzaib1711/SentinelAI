@@ -1,0 +1,46 @@
+{
+  "model": "C:\\Users\\ZnCl2\\Desktop\\SentinelAI\\backend\\app\\models\\sentinel_blueprint.pt",
+  "dataset": "C:\\Users\\ZnCl2\\Desktop\\SentinelAI\\ml\\blueprint\\dataset_v6.yaml",
+  "split": "test",
+  "conf_threshold": 0.25,
+  "iou_threshold": 0.7,
+  "image_count": 6,
+  "ground_truth_counts": {
+    "Blueprint": 7,
+    "wall": 132
+  },
+  "overall": {
+    "precision": 0.9579,
+    "recall": 0.953,
+    "f1": 0.9555,
+    "mAP50": 0.9666,
+    "mAP50-95": 0.7504,
+    "macro_precision": 0.9579,
+    "macro_recall": 0.953,
+    "macro_f1": 0.9555
+  },
+  "per_class": [
+    {
+      "class": "Blueprint",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mAP50": 0.995,
+      "mAP50-95": 0.8972
+    },
+    {
+      "class": "wall",
+      "precision": 0.9158,
+      "recall": 0.9061,
+      "f1": 0.9109,
+      "mAP50": 0.9383,
+      "mAP50-95": 0.6036
+    }
+  ],
+  "warnings": [],
+  "notes": {
+    "accuracy": "Object detection has no single 'accuracy' like classification. Use precision, recall, F1, and mAP instead.",
+    "recommended_split": "Use --split test for wall evaluation. The Roboflow v6 val split only contains Blueprint labels.",
+    "artifacts": "C:\\Users\\ZnCl2\\Desktop\\SentinelAI\\ml\\blueprint\\runs\\eval_test"
+  }
+}

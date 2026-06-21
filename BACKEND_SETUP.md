@@ -23,21 +23,30 @@ Firebase Auth + Storage (optional)
 
 ---
 
-## Step 1 — PostgreSQL
+## Step 1 — PostgreSQL (Neon)
 
-### Docker
+1. Create a project at [neon.tech](https://neon.tech)
+2. Open **Connect** and copy both connection strings:
+   - **Pooled** → `DATABASE_URL` (app + Prisma client)
+   - **Direct** → `DIRECT_URL` (migrations / `db push`)
+
+Set in `.env`:
+
+```env
+DATABASE_URL="postgresql://USER:PASS@ep-xxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
+DIRECT_URL="postgresql://USER:PASS@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require"
+FASTAPI_URL=http://localhost:8000
+```
+
+SSL is required for Neon — the app and Prisma scripts add `sslmode=require` automatically if it is missing.
+
+### Local Docker (optional)
+
 ```bash
 npm run db:up
 ```
 
-### Neon (cloud)
-Create a project at [neon.tech](https://neon.tech) and copy the connection string.
-
-Set in `.env`:
-```env
-DATABASE_URL="postgresql://sentinel:sentinel_dev@localhost:5432/sentinelai?schema=public"
-FASTAPI_URL=http://localhost:8000
-```
+Use `DB_*` vars in `.env` instead of `DATABASE_URL` (see `.env.example`). Set `DB_SSLMODE=disable` for local Postgres.
 
 ---
 

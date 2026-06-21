@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { computeImageLayout, layoutBoxStyle } from "@/lib/blueprint-layout";
 import { cn } from "@/lib/utils";
-import type { BlueprintMarker, BlindSpot, CoverageArea, MarkerType } from "@/types";
+import type { BlueprintLayout, BlueprintMarker, BlindSpot, CoverageArea, MarkerType } from "@/types";
 import {
   Tooltip,
   TooltipContent,
@@ -41,6 +41,8 @@ const markerColors: Record<MarkerType, string> = {
 
 interface BlueprintViewerProps {
   markers?: BlueprintMarker[];
+  layout?: BlueprintLayout | null;
+  showLayout?: boolean;
   coverageAreas?: CoverageArea[];
   blindSpots?: BlindSpot[];
   routes?: { waypoints: { x: number; y: number }[]; color?: string; isSafest?: boolean }[];
@@ -57,6 +59,8 @@ interface BlueprintViewerProps {
 
 export function BlueprintViewer({
   markers = [],
+  layout = null,
+  showLayout = true,
   coverageAreas = [],
   blindSpots = [],
   routes = [],
@@ -136,6 +140,51 @@ export function BlueprintViewer({
 
   const overlayContent = (
     <>
+      {showLayout && layout?.blueprintBounds && (
+        <div
+          className="pointer-events-none absolute border-2 border-amber-400/70"
+          style={{
+            left: `${layout.blueprintBounds.x}%`,
+            top: `${layout.blueprintBounds.y}%`,
+            width: `${layout.blueprintBounds.width}%`,
+            height: `${layout.blueprintBounds.height}%`,
+          }}
+        />
+      )}
+
+      {showLayout &&
+        layout?.walls?.map((wall, i) => (
+          <div
+            key={`wall-${i}`}
+            className="pointer-events-none absolute bg-orange-500/35"
+            style={{
+              left: `${wall.x}%`,
+              top: `${wall.y}%`,
+              width: `${wall.width}%`,
+              height: `${wall.height}%`,
+            }}
+          />
+        ))}
+
+      {showLayout &&
+        layout?.rooms?.map((room) => (
+          <div
+            key={room.id}
+            className="pointer-events-none absolute border border-dashed border-emerald-400/80 bg-emerald-500/10"
+            style={{
+              left: `${room.x - room.width / 2}%`,
+              top: `${room.y - room.height / 2}%`,
+              width: `${room.width}%`,
+              height: `${room.height}%`,
+            }}
+            title={room.label}
+          >
+            <span className="absolute left-0.5 top-0.5 rounded bg-black/50 px-1 text-[8px] text-emerald-300">
+              {room.label}
+            </span>
+          </div>
+        ))}
+
       {showCoverage &&
         coverageAreas.map((area) => (
           <div

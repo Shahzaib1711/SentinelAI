@@ -5,6 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.services.blueprint_detector import blueprint_model_status
 
 router = APIRouter(tags=["health"])
 
@@ -17,4 +18,5 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         "database": "connected",
         "firebase": bool(os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID") or os.getenv("FIREBASE_PROJECT_ID")),
         "api": "fastapi",
+        "blueprintMl": blueprint_model_status(),
     }

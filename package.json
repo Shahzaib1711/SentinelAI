@@ -14,7 +14,11 @@
     "db:studio": "node scripts/with-database-url.mjs npx prisma studio",
     "db:up": "docker compose up -d",
     "api:install": "cd backend && python -m pip install -r requirements.txt",
-    "api:dev": "cd backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+    "api:dev": "cd backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "ml:blueprint:bootstrap": "python ml/blueprint/bootstrap_dataset.py",
+    "ml:blueprint:train": "python ml/blueprint/train.py",
+    "ml:blueprint:eval": "python ml/blueprint/evaluate.py",
+    "ml:blueprint:deploy": "python ml/blueprint/deploy.py"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

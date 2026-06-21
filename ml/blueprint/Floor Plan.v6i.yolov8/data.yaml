@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 2
+names: ['Blueprint', 'wall']
+
+roboflow:
+  workspace: build-smart
+  project: floor-plan-xwrkv
+  version: 6
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/build-smart/floor-plan-xwrkv/dataset/6

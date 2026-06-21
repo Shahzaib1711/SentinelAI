@@ -1,4 +1,4 @@
-import type { BlindSpot, BlueprintMarker, CoverageArea, Recommendation, ThreatLevel } from "@/types";
+import type { BlindSpot, BlueprintLayout, BlueprintMarker, CoverageArea, Recommendation, ThreatLevel } from "@/types";
 import { DEFAULT_EVENT_SLUG } from "@/lib/services/events";
 
 const BASE = "/api/v1";
@@ -95,6 +95,7 @@ export const blueprintApi = {
     fetchJson<{
       ok: boolean;
       markers: BlueprintMarker[];
+      layout?: BlueprintLayout;
       summary: Record<string, unknown>;
     }>(`${BASE}/events/${slug}/blueprint`, {
       method: "POST",
