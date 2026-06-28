@@ -27,8 +27,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 |------|-------|-------------|
 | Dashboard | `/dashboard` | KPI cards, threat trends, active threats |
 | Venue Setup | `/venue-setup` | Blueprint upload and marker placement |
+| Security Planning | `/security-planning` | Blueprint analysis, guard/camera deployment |
 | Coverage Analysis | `/coverage-analysis` | Camera coverage and blind spots |
-| Route Planning | `/route-planning` | VIP escort route comparison |
 | Live Monitoring | `/live-monitoring` | Real-time camera feeds and alerts |
 | Threat Intelligence | `/threat-intelligence` | Heatmaps and threat analytics |
 | Incident Center | `/incident-center` | Incident tracking and details |
@@ -51,11 +51,10 @@ src/
     └── index.ts          # TypeScript interfaces
 ```
 
-## Backend (FastAPI + PostgreSQL + Firebase)
+## Backend (FastAPI + PostgreSQL)
 
 - **FastAPI** — all API routes (`backend/`)
 - **PostgreSQL** — database (Prisma schema + seed)
-- **Firebase** — auth & blueprint storage
 
 ```bash
 # See BACKEND_SETUP.md for full instructions

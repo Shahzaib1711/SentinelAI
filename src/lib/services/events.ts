@@ -1,29 +1,19 @@
-import { prisma } from "@/lib/db/prisma";
-
 export const DEFAULT_EVENT_SLUG =
   process.env.NEXT_PUBLIC_DEFAULT_EVENT_SLUG ?? "summit-2026";
 
-export async function getEventBySlug(slug: string) {
-  return prisma.event.findUnique({
-    where: { slug },
-    include: {
-      venue: {
-        include: {
-          blueprints: {
-            include: { markers: true, blindSpots: true },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-        },
-      },
-      cameras: { orderBy: { id: "asc" } },
-      incidents: { orderBy: { time: "desc" } },
-      alerts: { orderBy: { timestamp: "desc" } },
-      activeThreats: { orderBy: { detectedAt: "desc" } },
-      timelineEvents: true,
-      riskZones: true,
-      routes: true,
-      recommendations: true,
-    },
-  });
+export const ACTIVE_EVENT_SLUG_KEY = "sentinel-active-event-slug";
+
+export function getStoredEventSlug(): string {
+  if (typeof window === "undefined") return DEFAULT_EVENT_SLUG;
+  return localStorage.getItem(ACTIVE_EVENT_SLUG_KEY) ?? DEFAULT_EVENT_SLUG;
+}
+
+export function setStoredEventSlug(slug: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ACTIVE_EVENT_SLUG_KEY, slug);
+}
+
+/** Default slug for API calls when no explicit slug is passed. */
+export function getActiveEventSlug(): string {
+  return getStoredEventSlug();
 }

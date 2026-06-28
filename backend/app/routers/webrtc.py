@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException
 
 from app.config import settings
+from app.database import SessionLocal
 from app.services.signaling import get_room, reset_room, room_state
 from app.services.person_identifier import clear_track_enrollment_for_camera, enrich_person_detections
 from app.services.personnel_store import clear_camera_personnel, update_camera_personnel
@@ -29,7 +30,7 @@ async def _run_detection(camera_id: str, frame: str) -> None:
 
     try:
         loop = asyncio.get_running_loop()
-        def _detect_and_identify() -> tuple[list, list]:
+        def _detect_and_identify() -> tuple[list, list, list]:
             from app.services.enrollment_gallery import get_default_event_id
 
             img = decode_frame_data_url(frame)
@@ -45,12 +46,39 @@ async def _run_detection(camera_id: str, frame: str) -> None:
                 event_id=get_default_event_id(),
             )
 
-        enriched, personnel = await loop.run_in_executor(_executor, _detect_and_identify)
+        enriched, personnel, unknown_captures = await loop.run_in_executor(
+            _executor, _detect_and_identify
+        )
         room.latest_detections = enriched
         room.latest_personnel = personnel
         room.detections_updated_at = now
         room.last_detection_run_at = now
         update_camera_personnel(camera_id, personnel)
+
+        if unknown_captures:
+            event_id = None
+            from app.services.enrollment_gallery import get_default_event_id
+
+            event_id = get_default_event_id()
+            if event_id:
+                seen: set[str] = set()
+                async with SessionLocal() as db:
+                    from app.services.detected_person_store import persist_unknown_capture
+
+                    for record in unknown_captures:
+                        if record.id in seen:
+                            continue
+                        seen.add(record.id)
+                        try:
+                            await persist_unknown_capture(
+                                db, event_id, record, now_ms=now
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "Failed to persist detected person %s: %s",
+                                record.id,
+                                exc,
+                            )
     except Exception as exc:
         logger.warning("Detection task failed for %s: %s", camera_id, exc)
     finally:

@@ -48,4 +48,6 @@ def map_marker_type(marker_type: MarkerType) -> str:
 def to_db_marker_type(marker_type: str) -> MarkerType:
     if marker_type == "vip-route":
         return MarkerType.vip_route
+    if marker_type == "restricted":
+        raise ValueError("Restricted zone markers are no longer supported")
     return MarkerType(marker_type)

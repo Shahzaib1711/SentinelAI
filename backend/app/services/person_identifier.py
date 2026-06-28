@@ -11,6 +11,8 @@ from app.services.camera_zones import (
     classify_at_point,
 )
 from app.services.enrollment_gallery import identify_person_in_frame, resolve_event_id_for_matching
+from app.services.face_recognition import extract_face_from_person_crop
+from app.services.unknown_faces_gallery import UnknownRecord, resolve_or_register_unknown
 
 try:
     import numpy as np
@@ -27,7 +29,6 @@ TRACK_STALE_MS = 4_000
 _ROLE_LABELS = {
     "guard": "Guard",
     "vip": "VIP",
-    "restricted": "Restricted",
     "entrance": "Entrance",
     "visitor": "Visitor",
 }
@@ -37,7 +38,6 @@ _ROLE_TYPES = {
     "vip": "vip",
     "staff": "person",
     "contractor": "person",
-    "restricted": "person",
     "entrance": "person",
     "visitor": "person",
 }
@@ -67,18 +67,22 @@ def _set_track_enrollment(
     camera_id: str,
     track_id: int,
     *,
-    enrolled_id: str,
+    enrolled_id: str | None = None,
+    detected_id: str | None = None,
     name: str,
     designation: str,
     role: str,
     score: float,
+    captured: bool = False,
 ) -> None:
     _track_enrollment.setdefault(camera_id, {})[track_id] = {
         "enrolled_id": enrolled_id,
+        "detected_id": detected_id,
         "name": name,
         "designation": designation,
         "role": role,
         "score": score,
+        "captured": captured,
     }
 
 
@@ -180,13 +184,14 @@ def enrich_person_detections(
     frame_bgr: Any | None = None,
     event_id: str | None = None,
     camera_anchors: dict[str, dict[str, Any]] | None = None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[UnknownRecord]]:
     """
     Tag person detections with role, track id, posture, and blueprint position.
-    Returns (all_detections, personnel_only).
+    Returns (all_detections, personnel_only, unknown_captures_for_db).
     """
     enriched: list[dict[str, Any]] = []
     personnel: list[dict[str, Any]] = []
+    unknown_captures: list[UnknownRecord] = []
     resolve_event_id = resolve_event_id_for_matching(event_id)
 
     for det in detections:
@@ -205,10 +210,12 @@ def enrich_person_detections(
 
         role = zone_role
         enrolled_id: str | None = None
+        detected_id: str | None = None
         enrolled_name: str | None = None
         designation: str | None = None
         face_match_score = 0.0
         identified = False
+        captured = False
 
         cached = _get_track_enrollment(camera_id, track_id)
         if frame_bgr is not None and resolve_event_id:
@@ -235,26 +242,74 @@ def enrich_person_detections(
                     role=match.role,
                     score=face_match_score,
                 )
-            elif cached:
-                enrolled_id = cached["enrolled_id"]
+            else:
+                face_data = extract_face_from_person_crop(
+                    frame_bgr,
+                    float(det.get("x", 0)),
+                    float(det.get("y", 0)),
+                    float(det.get("width", 15)),
+                    float(det.get("height", 20)),
+                )
+                if face_data is not None:
+                    embedding, photo_url = face_data
+                    unknown = resolve_or_register_unknown(
+                        resolve_event_id,
+                        embedding,
+                        photo_url=photo_url or None,
+                        camera_id=camera_id,
+                    )
+                    detected_id = unknown.id
+                    enrolled_name = unknown.label
+                    role = zone_role
+                    identified = True
+                    captured = True
+                    face_match_score = 1.0
+                    unknown_captures.append(unknown)
+                    _set_track_enrollment(
+                        camera_id,
+                        track_id,
+                        detected_id=unknown.id,
+                        name=unknown.label,
+                        designation="",
+                        role=zone_role,
+                        score=face_match_score,
+                        captured=True,
+                    )
+                elif cached:
+                    enrolled_id = cached.get("enrolled_id")
+                    detected_id = cached.get("detected_id")
+                    enrolled_name = cached["name"]
+                    designation = cached.get("designation") or None
+                    role = cached["role"]
+                    face_match_score = float(cached.get("score", 0))
+                    identified = True
+                    captured = bool(cached.get("captured"))
+            if not identified and cached:
+                enrolled_id = cached.get("enrolled_id")
+                detected_id = cached.get("detected_id")
                 enrolled_name = cached["name"]
                 designation = cached.get("designation") or None
                 role = cached["role"]
                 face_match_score = float(cached.get("score", 0))
                 identified = True
+                captured = bool(cached.get("captured"))
 
         if identified and enrolled_name:
-            display_label = _display_label(enrolled_name, role, designation)
+            if captured:
+                display_label = enrolled_name
+            else:
+                display_label = _display_label(enrolled_name, role, designation)
         else:
             track_suffix = f" #{track_id:02d}"
             display_label = f"{_ROLE_LABELS.get(role, 'Visitor')}{track_suffix}"
 
         posture = "Standing" if standing else "Moving"
-        det_id = (
-            f"{camera_id}-enrolled-{enrolled_id}"
-            if enrolled_id
-            else f"{camera_id}-track-{track_id}"
-        )
+        if enrolled_id:
+            det_id = f"{camera_id}-enrolled-{enrolled_id}"
+        elif detected_id:
+            det_id = f"{camera_id}-detected-{detected_id}"
+        else:
+            det_id = f"{camera_id}-track-{track_id}"
 
         item = {
             **det,
@@ -271,17 +326,19 @@ def enrich_person_detections(
             "blueprintX": bp_x,
             "blueprintY": bp_y,
             "enrolledPersonId": enrolled_id,
+            "detectedPersonId": detected_id,
             "enrolledName": enrolled_name,
             "designation": designation,
             "faceMatchScore": round(face_match_score, 3) if face_match_score else None,
             "identified": identified,
+            "captured": captured,
         }
         enriched.append(item)
 
         if standing:
             personnel.append(
                 {
-                    "id": enrolled_id or f"{camera_id}-p{track_id}",
+                    "id": enrolled_id or detected_id or f"{camera_id}-p{track_id}",
                     "trackId": track_id,
                     "role": role,
                     "label": display_label,
@@ -295,11 +352,13 @@ def enrich_person_detections(
                     "frameX": round(cx, 1),
                     "frameY": round(cy, 1),
                     "enrolledPersonId": enrolled_id,
+                    "detectedPersonId": detected_id,
                     "enrolledName": enrolled_name,
                     "designation": designation,
                     "identified": identified,
+                    "captured": captured,
                     "faceMatchScore": round(face_match_score, 3) if face_match_score else None,
                 }
             )
 
-    return enriched, personnel
+    return enriched, personnel, unknown_captures

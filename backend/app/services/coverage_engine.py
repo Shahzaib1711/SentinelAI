@@ -73,7 +73,10 @@ def _cluster_blind_cells(cells: list[tuple[int, int]], step: int) -> list[dict[s
     return blind_spots
 
 
-def analyze_coverage(markers: list[dict[str, Any]]) -> dict[str, Any]:
+def analyze_coverage(
+    markers: list[dict[str, Any]],
+    blueprint_bounds: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     coverage_areas: list[dict[str, float]] = []
     for m in markers:
         if m["type"] != "camera":
@@ -84,18 +87,29 @@ def analyze_coverage(markers: list[dict[str, Any]]) -> dict[str, Any]:
                 "cameraId": m.get("label", m["id"]),
                 "x": float(m["x"]),
                 "y": float(m["y"]),
-                "radius": 22.0,
-                "angle": 90.0,
-                "facing": 90.0,
+                "radius": float(m.get("radius", 22.0)),
+                "angle": float(m.get("angle", 90.0)),
+                "facing": float(m.get("facing", 90.0)),
             }
         )
 
-    step = 6
+    step = 5
+    if blueprint_bounds and blueprint_bounds.get("width", 0) > 5:
+        x0 = max(2, int(float(blueprint_bounds["x"])))
+        y0 = max(2, int(float(blueprint_bounds["y"])))
+        x1 = min(98, int(x0 + float(blueprint_bounds["width"])))
+        y1 = min(98, int(y0 + float(blueprint_bounds["height"])))
+        x_range = range(x0 + step // 2, x1, step)
+        y_range = range(y0 + step // 2, y1, step)
+    else:
+        x_range = range(5, 96, step)
+        y_range = range(5, 96, step)
+
     uncovered_cells: list[tuple[int, int]] = []
     total = 0
 
-    for x in range(5, 96, step):
-        for y in range(5, 96, step):
+    for x in x_range:
+        for y in y_range:
             total += 1
             if not _cell_covered(float(x), float(y), coverage_areas):
                 uncovered_cells.append((x, y))

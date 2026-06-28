@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { pollRoom } from "@/lib/webrtc";
+import { FRAME_RELAY_INTERVAL_MS } from "@/lib/streaming";
 import type { Detection } from "@/types";
 
 type RelayState = "waiting" | "connected";
@@ -48,7 +49,7 @@ export function useFrameRelayView(cameraId: string) {
       } catch {
         setState("waiting");
       }
-    }, 300);
+    }, FRAME_RELAY_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [cameraId]);

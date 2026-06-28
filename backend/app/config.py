@@ -26,14 +26,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     default_event_slug: str = "summit-2026"
-    firebase_project_id: str | None = None
-    google_application_credentials: str | None = None
-    firebase_service_account_json: str | None = None
 
     yolo_enabled: bool = True
     yolo_model: str = "yolov8n.pt"
     yolo_confidence: float = 0.4
-    yolo_interval_ms: int = 1000
+    yolo_interval_ms: int = 100  # env: YOLO_INTERVAL_MS — 100ms ≈ 10 FPS detection
 
     face_match_threshold: float = 0.45  # env: FACE_MATCH_THRESHOLD
     default_event_id: str | None = None
@@ -42,6 +39,18 @@ class Settings(BaseSettings):
     blueprint_ml_model: str = "backend/app/models/sentinel_blueprint.pt"
     blueprint_ml_confidence: float = 0.10
     blueprint_ml_imgsz: int = 1280
+
+    floor_plan_ml_enabled: bool = True
+    floor_plan_ml_model: str = "backend/app/models/floor_plan_best.pt"
+    floor_plan_ml_confidence: float = 0.25
+    floor_plan_ml_imgsz: int = 1280
+
+    # Security planning chat — OpenAI-compatible LLM (falls back to regex if unset)
+    llm_enabled: bool = True
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    llm_model: str = "gpt-4o-mini"
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_timeout_s: float = 45.0
 
     @model_validator(mode="after")
     def build_database_url(self) -> Self:

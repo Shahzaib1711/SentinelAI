@@ -1,17 +1,16 @@
-"""Per-camera frame zones for guard / VIP / restricted role classification."""
+"""Per-camera frame zones for guard / VIP / entrance role classification."""
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
-ZoneRole = Literal["guard", "vip", "restricted", "entrance"]
+ZoneRole = Literal["guard", "vip", "entrance"]
 
 # Normalized rectangles (0–100) on the camera frame.
 # Person centroid inside a zone inherits that role (highest priority wins).
 _ZONE_PRIORITY: dict[ZoneRole, int] = {
     "vip": 4,
     "guard": 3,
-    "restricted": 2,
     "entrance": 1,
 }
 

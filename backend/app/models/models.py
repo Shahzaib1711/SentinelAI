@@ -28,7 +28,6 @@ class MarkerType(str, enum.Enum):
     entrance = "entrance"
     exit = "exit"
     guard = "guard"
-    restricted = "restricted"
     vip_route = "vip_route"
 
 
@@ -72,7 +71,6 @@ class User(Base):
     __tablename__ = "User"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    firebaseUid: Mapped[str] = mapped_column(String, unique=True)
     email: Mapped[str] = mapped_column(String, unique=True)
     name: Mapped[str] = mapped_column(String)
     role: Mapped[UserRole] = mapped_column(UserRoleEnum, default=UserRole.operator)
@@ -118,6 +116,7 @@ class Event(Base):
     routes: Mapped[list["Route"]] = relationship(back_populates="event")
     recommendations: Mapped[list["Recommendation"]] = relationship(back_populates="event")
     enrolledPersonnel: Mapped[list["EnrolledPerson"]] = relationship(back_populates="event")
+    detectedPersons: Mapped[list["DetectedPerson"]] = relationship(back_populates="event")
 
 
 class Venue(Base):
@@ -147,7 +146,6 @@ class Blueprint(Base):
     name: Mapped[str] = mapped_column(String)
     type: Mapped[str] = mapped_column(String, default="floor_plan")
     storageUrl: Mapped[str | None] = mapped_column(String, nullable=True)
-    firebasePath: Mapped[str | None] = mapped_column(String, nullable=True)
     coveragePct: Mapped[int] = mapped_column(Integer, default=0)
     vulnerabilityScore: Mapped[int] = mapped_column(Integer, default=0)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -347,3 +345,26 @@ class EnrolledPerson(Base):
     )
 
     event: Mapped["Event"] = relationship(back_populates="enrolledPersonnel")
+
+
+class DetectedPerson(Base):
+    __tablename__ = "DetectedPerson"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    eventId: Mapped[str] = mapped_column(String, ForeignKey("Event.id", ondelete="CASCADE"))
+    label: Mapped[str] = mapped_column(String)
+    photoUrl: Mapped[str | None] = mapped_column(Text, nullable=True)
+    embeddingJson: Mapped[Any] = mapped_column(JSONB)
+    cameraId: Mapped[str | None] = mapped_column(String, nullable=True)
+    sightingCount: Mapped[int] = mapped_column(Integer, default=1)
+    firstSeenAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    lastSeenAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updatedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
+
+    event: Mapped["Event"] = relationship(back_populates="detectedPersons")

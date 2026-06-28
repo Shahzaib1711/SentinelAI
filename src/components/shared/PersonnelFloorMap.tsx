@@ -24,12 +24,6 @@ const ROLE_STYLES = {
     icon: User,
     label: "text-cyan-300",
   },
-  restricted: {
-    bg: "bg-red-500",
-    ring: "ring-red-300/50",
-    icon: User,
-    label: "text-red-300",
-  },
   entrance: {
     bg: "bg-green-500",
     ring: "ring-green-300/50",

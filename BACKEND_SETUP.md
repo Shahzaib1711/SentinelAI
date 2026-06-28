@@ -1,4 +1,4 @@
-# Backend Setup — FastAPI + PostgreSQL + Firebase
+# Backend Setup — FastAPI + PostgreSQL
 
 ## Architecture
 
@@ -10,7 +10,6 @@ FastAPI (backend)   :8000  ← all REST + WebRTC signaling
         │
         ▼
 PostgreSQL (Prisma migrations + seed from Node)
-Firebase Auth + Storage (optional)
 ```
 
 | Layer | Tech | Role |
@@ -18,8 +17,7 @@ Firebase Auth + Storage (optional)
 | **API** | FastAPI + Uvicorn | All `/api/*` endpoints |
 | **Database** | PostgreSQL + Prisma | Schema, migrations, seed |
 | **ORM (API)** | SQLAlchemy async | FastAPI reads/writes Postgres |
-| **Auth** | Firebase Admin (Python) | Verify JWT tokens |
-| **Files** | Firebase Storage | Blueprint uploads |
+| **Files** | PostgreSQL (`storageUrl`) | Blueprint images stored as data URLs |
 
 ---
 
@@ -111,16 +109,6 @@ npm run dev
 ```
 
 Next.js proxies `/api/*` → FastAPI (`FASTAPI_URL` in `.env`).
-
----
-
-## Step 5 — Firebase (optional)
-
-1. Create project at [Firebase Console](https://console.firebase.google.com)
-2. Enable **Authentication** and **Storage**
-3. Add web config to `.env` (`NEXT_PUBLIC_FIREBASE_*`)
-4. Download service account JSON → `firebase-service-account.json`
-5. Set `GOOGLE_APPLICATION_CREDENTIALS=./firebase-service-account.json`
 
 ---
 

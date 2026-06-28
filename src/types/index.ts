@@ -7,7 +7,6 @@ export type MarkerType =
   | "entrance"
   | "exit"
   | "guard"
-  | "restricted"
   | "vip-route";
 
 export interface BlueprintMarker {
@@ -24,6 +23,8 @@ export interface BlueprintLayoutBox {
   width: number;
   height: number;
   confidence?: number;
+  label?: string;
+  class?: string;
 }
 
 export interface BlueprintRoom extends BlueprintLayoutBox {
@@ -36,7 +37,13 @@ export interface BlueprintLayout {
   blueprintBounds?: BlueprintLayoutBox;
   walls?: BlueprintLayoutBox[];
   rooms?: BlueprintRoom[];
-  entrances?: { x: number; y: number; side?: string; label?: string }[];
+  doors?: BlueprintLayoutBox[];
+  columns?: BlueprintLayoutBox[];
+  windows?: BlueprintLayoutBox[];
+  railings?: BlueprintLayoutBox[];
+  dimensions?: BlueprintLayoutBox[];
+  objectCounts?: Record<string, number>;
+  entrances?: { x: number; y: number; side?: string; label?: string; source?: string }[];
 }
 
 export interface Alert {
@@ -132,7 +139,7 @@ export interface TimelineEvent {
 
 export type DetectionType = "person" | "vehicle" | "bag" | "animal" | "guard" | "vip";
 
-export type PersonRole = "guard" | "vip" | "visitor" | "restricted" | "entrance";
+export type PersonRole = "guard" | "vip" | "visitor" | "entrance";
 
 export interface Detection {
   id: string;

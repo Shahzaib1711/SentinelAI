@@ -59,14 +59,3 @@ export function WebRTCViewer({ cameraId, className }: WebRTCViewerProps) {
     </div>
   );
 }
-
-export function WebRTCFeedPlaceholder({ cameraId }: { cameraId: string }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 bg-slate-900 p-4 text-center">
-      <Camera className="h-8 w-8 text-muted-foreground/40" />
-      <p className="text-[10px] text-muted-foreground">
-        Phone stream: /broadcast?camera={cameraId}
-      </p>
-    </div>
-  );
-}

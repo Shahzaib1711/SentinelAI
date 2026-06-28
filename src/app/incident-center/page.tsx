@@ -1,36 +1,102 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Loader2, Plus, RefreshCw } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { IncidentTable } from "@/components/shared/IncidentTable";
 import { PageHeader, LoadingState } from "@/components/shared/PageElements";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api-client";
-import { incidents as mockIncidents } from "@/lib/mock-data";
-import type { Incident } from "@/types";
-import { cn, getThreatColor } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useEvent } from "@/contexts/EventContext";
+import { incidentsApi, type UpdateIncidentInput } from "@/lib/api/incidents";
+import type { Incident, IncidentStatus, ThreatLevel } from "@/types";
+import { cn } from "@/lib/utils";
+
+const THREAT_LEVELS: ThreatLevel[] = ["low", "medium", "high", "critical"];
 
 export default function IncidentCenterPage() {
+  const { slug } = useEvent();
   const [filter, setFilter] = useState("all");
-  const [incidents, setIncidents] = useState<Incident[]>(mockIncidents);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dataSource, setDataSource] = useState<"api" | "mock">("mock");
+  const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    location: "",
+    description: "",
+    threatLevel: "medium" as ThreatLevel,
+    assignedTo: "",
+    status: "open" as IncidentStatus,
+    cameraId: "",
+  });
+
+  const loadIncidents = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await incidentsApi.list(slug);
+      setIncidents(res.incidents);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load incidents");
+      setIncidents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const res = await api.incidents();
-        setIncidents(res.incidents);
-        setDataSource("api");
-      } catch {
-        setIncidents(mockIncidents);
-        setDataSource("mock");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    void loadIncidents();
+  }, [loadIncidents]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    setFormError(null);
+    try {
+      const res = await incidentsApi.create(
+        {
+          location: form.location.trim(),
+          description: form.description.trim(),
+          threatLevel: form.threatLevel,
+          assignedTo: form.assignedTo.trim() || "Unassigned",
+          status: form.status,
+          ...(form.cameraId.trim() ? { cameraId: form.cameraId.trim() } : {}),
+        },
+        slug
+      );
+      setIncidents((prev) => [res.incident, ...prev]);
+      setForm({
+        location: "",
+        description: "",
+        threatLevel: "medium",
+        assignedTo: "",
+        status: "open",
+        cameraId: "",
+      });
+      setShowForm(false);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to create incident");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleUpdate = async (id: string, patch: UpdateIncidentInput) => {
+    const res = await incidentsApi.update(id, patch);
+    setIncidents((prev) => prev.map((i) => (i.id === id ? res.incident : i)));
+  };
 
   const filtered = incidents.filter((inc) => {
     if (filter === "all") return true;
@@ -47,21 +113,116 @@ export default function IncidentCenterPage() {
 
   if (loading) {
     return (
-      <AppLayout title="Incident Center" subtitle="Security incident tracking and management">
+      <AppLayout title="Incident Center">
         <LoadingState message="Loading incidents..." />
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout
-      title="Incident Center"
-      subtitle={`Security incident tracking · ${dataSource === "api" ? "PostgreSQL" : "Mock data"}`}
-    >
+    <AppLayout title="Incident Center">
       <PageHeader
         title="Incident Management Center"
-        description="Track, investigate, and resolve security incidents across the venue"
+        description="Track, investigate, and resolve security incidents for the active event"
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => void loadIncidents()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => setShowForm((v) => !v)}>
+              <Plus className="mr-2 h-4 w-4" />
+              {showForm ? "Hide form" : "Log incident"}
+            </Button>
+          </div>
+        }
       />
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+          {error}
+          <Button variant="ghost" size="sm" className="ml-2" onClick={() => void loadIncidents()}>
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {showForm && (
+        <Card className="soc-panel mb-6 border-cyan-500/20">
+          <CardContent className="pt-6">
+            <form onSubmit={handleCreate} className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Location</label>
+                <Input
+                  required
+                  placeholder="Main Entrance"
+                  value={form.location}
+                  onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Threat level</label>
+                <Select
+                  value={form.threatLevel}
+                  onValueChange={(v) => setForm((f) => ({ ...f, threatLevel: v as ThreatLevel }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {THREAT_LEVELS.map((level) => (
+                      <SelectItem key={level} value={level} className="capitalize">
+                        {level}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-medium">Description</label>
+                <Textarea
+                  required
+                  rows={3}
+                  placeholder="What happened?"
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Assigned to</label>
+                <Input
+                  placeholder="Team Alpha — optional"
+                  value={form.assignedTo}
+                  onChange={(e) => setForm((f) => ({ ...f, assignedTo: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Camera ID</label>
+                <Input
+                  placeholder="CAM-01 — optional"
+                  value={form.cameraId}
+                  onChange={(e) => setForm((f) => ({ ...f, cameraId: e.target.value }))}
+                />
+              </div>
+              {formError && (
+                <p className="text-sm text-red-400 md:col-span-2">{formError}</p>
+              )}
+              <div className="md:col-span-2">
+                <Button type="submit" disabled={creating}>
+                  {creating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create incident"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
@@ -91,7 +252,7 @@ export default function IncidentCenterPage() {
               <TabsTrigger value="resolved">Resolved ({stats.resolved})</TabsTrigger>
             </TabsList>
             <TabsContent value={filter}>
-              <IncidentTable incidents={filtered} />
+              <IncidentTable incidents={filtered} onUpdate={handleUpdate} />
             </TabsContent>
           </Tabs>
         </CardContent>

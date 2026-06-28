@@ -7,31 +7,30 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  Brain,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
-  FileText,
   LayoutDashboard,
   Map,
-  MapPin,
   Radio,
-  Shield,
-  Target,
   UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { SentinelLogo } from "@/components/brand/SentinelLogo";
+import { EventSelector } from "@/components/shared/EventSelector";
 
 const navItems = [
+  { href: "/events", label: "Events", icon: CalendarDays },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/venue-setup", label: "Venue Setup", icon: Map },
-  { href: "/coverage-analysis", label: "Coverage Analysis", icon: Target },
-  { href: "/route-planning", label: "Route Planning", icon: MapPin },
+  { href: "/security-planning", label: "Security Planning", icon: Brain },
   { href: "/personnel-registry", label: "Personnel Registry", icon: UserCheck },
   { href: "/live-monitoring", label: "Live Monitoring", icon: Radio },
   { href: "/threat-intelligence", label: "Threat Intelligence", icon: Activity },
   { href: "/incident-center", label: "Incident Center", icon: AlertTriangle },
-  { href: "/reports", label: "Reports", icon: FileText },
 ];
 
 export function Sidebar() {
@@ -43,20 +42,16 @@ export function Sidebar() {
       animate={{ width: collapsed ? 64 : 240 }}
       className="relative flex h-screen flex-col border-r border-border/60 bg-card/50 backdrop-blur-sm"
     >
-      <div className="flex h-16 items-center gap-3 border-b border-border/60 px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
-          <Shield className="h-5 w-5 text-white" />
-        </div>
-        {!collapsed && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <h1 className="text-sm font-bold tracking-wide">
-              <span className="text-gradient-cyan">Sentinel</span>
-              <span className="text-foreground">AI</span>
-            </h1>
-            <p className="text-[10px] text-muted-foreground">Security Intelligence</p>
-          </motion.div>
+      <div
+        className={cn(
+          "flex h-[4.5rem] items-center border-b border-border/60 px-3",
+          collapsed ? "justify-center" : "justify-start"
         )}
+      >
+        <SentinelLogo variant={collapsed ? "icon" : "full"} priority />
       </div>
+
+      {!collapsed && <EventSelector className="border-b border-border/60 py-3" />}
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-2 scrollbar-thin">
         {navItems.map((item) => {

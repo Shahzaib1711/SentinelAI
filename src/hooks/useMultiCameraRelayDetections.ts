@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { pollRoom } from "@/lib/webrtc";
+import { FRAME_RELAY_INTERVAL_MS } from "@/lib/streaming";
 import type { Detection } from "@/types";
 
 type RelayRoom = {
@@ -10,7 +11,10 @@ type RelayRoom = {
 };
 
 /** Polls YOLO + face-ID detections for multiple camera relay rooms. */
-export function useMultiCameraRelayDetections(cameraIds: string[], pollMs = 400) {
+export function useMultiCameraRelayDetections(
+  cameraIds: string[],
+  pollMs = FRAME_RELAY_INTERVAL_MS
+) {
   const [byCamera, setByCamera] = useState<Record<string, Detection[]>>({});
   const lastAtRef = useRef<Record<string, number>>({});
 

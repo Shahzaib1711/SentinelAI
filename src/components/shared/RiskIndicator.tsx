@@ -4,63 +4,11 @@ import { cn, getThreatColor, getThreatBgColor } from "@/lib/utils";
 import type { ThreatLevel } from "@/types";
 import { Progress } from "@/components/ui/progress";
 
-interface RiskIndicatorProps {
-  score: number;
-  label?: string;
-  size?: "sm" | "md" | "lg";
-  showBar?: boolean;
-  className?: string;
-}
-
 function scoreToLevel(score: number): ThreatLevel {
   if (score >= 80) return "critical";
   if (score >= 60) return "high";
   if (score >= 35) return "medium";
   return "low";
-}
-
-export function RiskIndicator({
-  score,
-  label,
-  size = "md",
-  showBar = true,
-  className,
-}: RiskIndicatorProps) {
-  const level = scoreToLevel(score);
-
-  const sizeClasses = {
-    sm: "text-lg",
-    md: "text-2xl",
-    lg: "text-4xl",
-  };
-
-  return (
-    <div className={cn("space-y-2", className)}>
-      {label && (
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {label}
-        </p>
-      )}
-      <div className="flex items-end gap-2">
-        <span className={cn("font-bold font-mono", sizeClasses[size], getThreatColor(level))}>
-          {score}
-        </span>
-        <span className="mb-1 text-xs text-muted-foreground">/100</span>
-      </div>
-      {showBar && (
-        <Progress
-          value={score}
-          className={cn(
-            "h-1.5",
-            level === "critical" && "[&>div]:bg-red-500",
-            level === "high" && "[&>div]:bg-orange-500",
-            level === "medium" && "[&>div]:bg-yellow-500",
-            level === "low" && "[&>div]:bg-green-500"
-          )}
-        />
-      )}
-    </div>
-  );
 }
 
 interface RiskZoneCardProps {

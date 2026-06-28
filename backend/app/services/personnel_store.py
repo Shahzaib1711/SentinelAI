@@ -28,15 +28,17 @@ def get_all_personnel() -> list[dict[str, Any]]:
 
 
 def _unique_by_enrollment(people: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Count each enrolled person once; keep anonymous tracks per camera."""
+    """Count each enrolled or captured person once; keep anonymous tracks per camera."""
     seen: set[str] = set()
     unique: list[dict[str, Any]] = []
     for p in people:
         enrolled_id = p.get("enrolledPersonId")
-        if enrolled_id:
-            if enrolled_id in seen:
+        detected_id = p.get("detectedPersonId")
+        identity_key = enrolled_id or detected_id
+        if identity_key:
+            if identity_key in seen:
                 continue
-            seen.add(enrolled_id)
+            seen.add(identity_key)
         unique.append(p)
     return unique
 

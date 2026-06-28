@@ -23,6 +23,44 @@ def _box_to_percent(
     }
 
 
+def _room_is_plausible(room: dict[str, Any], *, min_span_pct: float = 4.0) -> bool:
+    """Drop margin slivers and tiny fragments that look nothing like real rooms."""
+    width = float(room.get("width", 0))
+    height = float(room.get("height", 0))
+    area = float(room.get("areaPct", 0))
+    if width <= 0 or height <= 0:
+        return False
+    if area < 1.2:
+        return False
+    if width < min_span_pct and height < min_span_pct:
+        return False
+    short = min(width, height)
+    long = max(width, height)
+    if short > 0 and long / short > 7.0:
+        return False
+    return True
+
+
+def _filter_rooms(rooms: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    kept = [r for r in rooms if _room_is_plausible(r)]
+    kept.sort(key=lambda r: r.get("areaPct", 0), reverse=True)
+    for i, room in enumerate(kept, start=1):
+        room["id"] = f"room-{i:02d}"
+        room["label"] = f"ROOM-{i:02d}"
+    return kept
+
+
+def _score_room_set(rooms: list[dict[str, Any]]) -> float:
+    """Prefer a few large plausible rooms over many tiny false splits."""
+    valid = [r for r in rooms if _room_is_plausible(r)]
+    if not valid:
+        return 0.0
+    area_sum = sum(float(r.get("areaPct", 0)) for r in valid)
+    count_penalty = max(0, len(valid) - 10) * 2.5
+    tiny_penalty = sum(1 for r in valid if float(r.get("areaPct", 0)) < 2.0) * 1.5
+    return area_sum - count_penalty - tiny_penalty
+
+
 def build_wall_mask(
     shape: tuple[int, int],
     wall_boxes_px: list[tuple[int, int, int, int]],
@@ -95,7 +133,7 @@ def extract_rooms_wall_grid(
     offset_y: int = 0,
     full_w: int | None = None,
     full_h: int | None = None,
-    min_area_pct: float = 0.04,
+    min_area_pct: float = 0.06,
     max_rooms: int = 16,
 ) -> list[dict[str, Any]]:
     """Split rooms using dominant horizontal/vertical wall lines."""
@@ -262,7 +300,7 @@ def extract_rooms(
         bw = int(stats[label, cv2.CC_STAT_WIDTH])
         bh = int(stats[label, cv2.CC_STAT_HEIGHT])
         area_pct = int(stats[label, cv2.CC_STAT_AREA]) / total * 100
-        cx, cy = centroids[label]
+        cx, cy = float(centroids[label][0]), float(centroids[label][1])
         px, py = _to_percent(offset_x + cx, offset_y + cy, full_w, full_h)
         box = _box_to_percent(offset_x + x, offset_y + y, bw, bh, full_w, full_h)
         rooms.append(
@@ -302,8 +340,8 @@ def extract_rooms_watershed(
     if float(dist.max()) <= 0:
         return []
 
-    min_sep = max(10, int(min(w, h) * 0.042))
-    min_val = max(4.0, float(dist.max()) * 0.12)
+    min_sep = max(14, int(min(w, h) * 0.055))
+    min_val = max(6.0, float(dist.max()) * 0.18)
     peaks = _local_maxima(dist, min_val, min_sep, max_peaks=max_rooms)
 
     if len(peaks) < 2:
@@ -362,32 +400,12 @@ def extract_rooms_smart(
     offset_y: int = 0,
     full_w: int | None = None,
     full_h: int | None = None,
-    min_area_pct: float = 0.04,
-    max_rooms: int = 16,
+    min_area_pct: float = 1.2,
+    max_rooms: int = 12,
 ) -> tuple[list[dict[str, Any]], str]:
-    """Pick the best room split from connected components, watershed, or wall grid."""
-    cc = extract_rooms(
-        free_mask,
-        offset_x=offset_x,
-        offset_y=offset_y,
-        full_w=full_w,
-        full_h=full_h,
-        min_area_pct=min_area_pct,
-        max_rooms=max_rooms,
-    )
-    watershed = extract_rooms_watershed(
-        free_mask,
-        offset_x=offset_x,
-        offset_y=offset_y,
-        full_w=full_w,
-        full_h=full_h,
-        min_area_pct=min_area_pct,
-        max_rooms=max_rooms,
-    )
-    grid: list[dict[str, Any]] = []
-    if wall_mask is not None and cv2.countNonZero(wall_mask) > 0:
-        grid = extract_rooms_wall_grid(
-            wall_mask,
+    """Pick the room split with the best quality score, not simply the most boxes."""
+    cc = _filter_rooms(
+        extract_rooms(
             free_mask,
             offset_x=offset_x,
             offset_y=offset_y,
@@ -396,18 +414,44 @@ def extract_rooms_smart(
             min_area_pct=min_area_pct,
             max_rooms=max_rooms,
         )
+    )
+    watershed = _filter_rooms(
+        extract_rooms_watershed(
+            free_mask,
+            offset_x=offset_x,
+            offset_y=offset_y,
+            full_w=full_w,
+            full_h=full_h,
+            min_area_pct=min_area_pct,
+            max_rooms=max_rooms,
+        )
+    )
+    grid: list[dict[str, Any]] = []
+    if wall_mask is not None and cv2.countNonZero(wall_mask) > 0:
+        grid = _filter_rooms(
+            extract_rooms_wall_grid(
+                wall_mask,
+                free_mask,
+                offset_x=offset_x,
+                offset_y=offset_y,
+                full_w=full_w,
+                full_h=full_h,
+                min_area_pct=min_area_pct,
+                max_rooms=max_rooms,
+            )
+        )
 
     options: list[tuple[str, list[dict[str, Any]]]] = [
         ("connected_components", cc),
         ("watershed", watershed),
         ("wall_grid", grid),
     ]
-    valid = [(name, rooms) for name, rooms in options if len(rooms) >= 2]
-    if not valid:
+    scored = [(name, rooms, _score_room_set(rooms)) for name, rooms in options if rooms]
+    if not scored:
         best_name, best = max(options, key=lambda item: len(item[1]))
         return best, best_name
 
-    best_name, best = max(valid, key=lambda item: len(item[1]))
+    best_name, best, _ = max(scored, key=lambda item: item[2])
     return best, best_name
 
 

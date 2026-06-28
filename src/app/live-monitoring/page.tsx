@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api } from "@/lib/api-client";
+import { useEvent } from "@/contexts/EventContext";
 import {
   cameras as mockCameras,
   recentAlerts as mockAlerts,
@@ -25,6 +26,7 @@ import type { Alert, Camera, ThreatLevel } from "@/types";
 import { cn, getThreatBgColor, getThreatColor, getThreatDotColor } from "@/lib/utils";
 
 export default function LiveMonitoringPage() {
+  const { slug } = useEvent();
   const [cameras, setCameras] = useState<Camera[]>(mockCameras);
   const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
   const [threatLevel, setThreatLevel] = useState<ThreatLevel>(dashboardKPIs.threatLevel);
@@ -38,7 +40,7 @@ export default function LiveMonitoringPage() {
   const feedCameras = cameras.filter((c) => c.status === "online").slice(0, 6);
   const feedCameraIds = feedCameras.map((c) => c.id);
   const relayDetectionsByCamera = useMultiCameraRelayDetections(feedCameraIds);
-  const { personnel, summary: personnelSummary } = useLivePersonnel(1000);
+  const { personnel, summary: personnelSummary } = useLivePersonnel(undefined, slug);
 
   const toggleCompareMode = () => {
     setCompareMode((on) => {
@@ -79,9 +81,9 @@ export default function LiveMonitoringPage() {
     void (async () => {
       try {
         const [camRes, alertRes, dashRes] = await Promise.all([
-          api.cameras(),
-          api.alerts(undefined, true),
-          api.dashboard(),
+          api.cameras(slug),
+          api.alerts(slug, true),
+          api.dashboard(slug),
         ]);
         setCameras(camRes.cameras);
         setAlerts(alertRes.alerts);
@@ -93,7 +95,7 @@ export default function LiveMonitoringPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [slug]);
 
   if (loading) {
     return (

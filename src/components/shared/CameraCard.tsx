@@ -294,35 +294,3 @@ export function CameraCard({
     </motion.div>
   );
 }
-
-export function CameraGrid({
-  cameras,
-  showFeeds = false,
-}: {
-  cameras: CameraType[];
-  showFeeds?: boolean;
-}) {
-  if (cameras.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16">
-        <Camera className="mb-3 h-12 w-12 text-muted-foreground/30" />
-        <p className="text-sm text-muted-foreground">No cameras configured</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {cameras.map((camera, i) => (
-        <motion.div
-          key={camera.id}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: i * 0.05 }}
-        >
-          <CameraCard camera={camera} showFeed={showFeeds} />
-        </motion.div>
-      ))}
-    </div>
-  );
-}

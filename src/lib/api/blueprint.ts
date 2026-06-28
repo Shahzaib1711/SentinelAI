@@ -1,5 +1,5 @@
-import type { BlindSpot, BlueprintLayout, BlueprintMarker, CoverageArea, Recommendation, ThreatLevel } from "@/types";
-import { DEFAULT_EVENT_SLUG } from "@/lib/services/events";
+import type { BlindSpot, BlueprintLayout, BlueprintMarker } from "@/types";
+import { getActiveEventSlug } from "@/lib/services/events";
 
 const BASE = "/api/v1";
 
@@ -30,7 +30,6 @@ export interface BlueprintData {
   name: string;
   type: string;
   storageUrl: string | null;
-  firebasePath: string | null;
   coveragePct: number;
   vulnerabilityScore: number;
   markers: BlueprintMarker[];
@@ -42,31 +41,20 @@ export interface BlueprintResponse {
   blueprint: BlueprintData;
 }
 
-export interface CoverageAnalysisResult {
-  metrics: {
-    coveragePercentage: number;
-    blindSpotsFound: number;
-    vulnerabilityScore: number;
-  };
-  coverageAreas: CoverageArea[];
-  blindSpots: BlindSpot[];
-  recommendations: Recommendation[];
-}
-
 export const blueprintApi = {
-  get: (slug = DEFAULT_EVENT_SLUG) =>
+  get: (slug = getActiveEventSlug()) =>
     fetchJson<BlueprintResponse>(`${BASE}/events/${slug}/blueprint`),
 
   addMarker: (
     payload: { type: string; x: number; y: number; label: string },
-    slug = DEFAULT_EVENT_SLUG
+    slug = getActiveEventSlug()
   ) =>
     fetchJson<{ marker: BlueprintMarker }>(`${BASE}/events/${slug}/blueprint`, {
       method: "POST",
       body: JSON.stringify({ action: "add-marker", ...payload }),
     }),
 
-  deleteMarker: (markerId: string, slug = DEFAULT_EVENT_SLUG) =>
+  deleteMarker: (markerId: string, slug = getActiveEventSlug()) =>
     fetchJson<{ ok: boolean }>(`${BASE}/events/${slug}/blueprint`, {
       method: "POST",
       body: JSON.stringify({ action: "delete-marker", markerId }),
@@ -75,23 +63,25 @@ export const blueprintApi = {
   updateStorage: (
     payload: {
       storageUrl?: string;
-      firebasePath?: string;
       name?: string;
       type?: string;
     },
-    slug = DEFAULT_EVENT_SLUG
+    slug = getActiveEventSlug()
   ) =>
     fetchJson<{ ok: boolean }>(`${BASE}/events/${slug}/blueprint`, {
       method: "POST",
       body: JSON.stringify({ action: "update-storage", ...payload }),
     }),
 
-  analyzeCoverage: (slug = DEFAULT_EVENT_SLUG) =>
-    fetchJson<CoverageAnalysisResult>(`${BASE}/events/${slug}/coverage/analyze`, {
-      method: "POST",
-    }),
-
-  autoDetect: (replace = true, storageUrl?: string, slug = DEFAULT_EVENT_SLUG) =>
+  autoDetect: (
+    options: {
+      replace?: boolean;
+      storageUrl?: string;
+      confidence?: number;
+      labels?: string[];
+    } = {},
+    slug = getActiveEventSlug()
+  ) =>
     fetchJson<{
       ok: boolean;
       markers: BlueprintMarker[];
@@ -101,17 +91,10 @@ export const blueprintApi = {
       method: "POST",
       body: JSON.stringify({
         action: "auto-detect",
-        replace,
-        ...(storageUrl ? { storageUrl } : {}),
+        replace: options.replace ?? true,
+        ...(options.storageUrl ? { storageUrl: options.storageUrl } : {}),
+        ...(options.confidence != null ? { confidence: options.confidence / 100 } : {}),
+        ...(options.labels?.length ? { labels: options.labels } : {}),
       }),
     }),
 };
-
-export function mapApiBlindSpot(
-  spot: BlindSpot & { severity: string }
-): BlindSpot {
-  return {
-    ...spot,
-    severity: spot.severity as ThreatLevel,
-  };
-}

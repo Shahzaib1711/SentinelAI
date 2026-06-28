@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { signalFetch } from "@/lib/webrtc";
+import { FRAME_RELAY_INTERVAL_MS } from "@/lib/streaming";
 
 /** Captures video frames and POSTs JPEGs through the API (works reliably via ngrok). */
 export function useFrameRelayBroadcast(
@@ -39,7 +40,7 @@ export function useFrameRelayBroadcast(
         sessionId,
         frame,
       });
-    }, 300);
+    }, FRAME_RELAY_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [cameraId, sessionId, videoRef, enabled]);

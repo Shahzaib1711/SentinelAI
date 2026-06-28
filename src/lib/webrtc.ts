@@ -1,17 +1,3 @@
-export const ICE_SERVERS: RTCIceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-];
-
-export function createPeerConnection(): RTCPeerConnection {
-  return new RTCPeerConnection({ iceServers: ICE_SERVERS });
-}
-
-/** Broadcaster peer id from camera id, e.g. CAM-01 → sentinel-CAM-01 */
-export function getBroadcastPeerId(cameraId: string): string {
-  return `sentinel-${cameraId}`;
-}
-
 export function createSessionId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }

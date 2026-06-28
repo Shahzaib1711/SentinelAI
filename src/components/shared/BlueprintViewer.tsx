@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Ban,
   Camera,
   Crown,
   DoorOpen,
@@ -14,6 +13,7 @@ import {
 import { computeImageLayout, layoutBoxStyle } from "@/lib/blueprint-layout";
 import { cn } from "@/lib/utils";
 import type { BlueprintLayout, BlueprintMarker, BlindSpot, CoverageArea, MarkerType } from "@/types";
+import type { LayoutOverlayToggles } from "@/lib/floor-plan-labels";
 import {
   Tooltip,
   TooltipContent,
@@ -26,7 +26,6 @@ const markerIcons: Record<MarkerType, React.ElementType> = {
   entrance: DoorOpen,
   exit: LogOut,
   guard: Shield,
-  restricted: Ban,
   "vip-route": Crown,
 };
 
@@ -35,14 +34,22 @@ const markerColors: Record<MarkerType, string> = {
   entrance: "bg-green-500 text-black",
   exit: "bg-blue-500 text-white",
   guard: "bg-purple-500 text-white",
-  restricted: "bg-red-500 text-white",
   "vip-route": "bg-yellow-500 text-black",
 };
+
+function resolveMarkerIcon(type: string): React.ElementType {
+  return markerIcons[type as MarkerType] ?? Shield;
+}
+
+function resolveMarkerColor(type: string): string {
+  return markerColors[type as MarkerType] ?? "bg-muted text-foreground";
+}
 
 interface BlueprintViewerProps {
   markers?: BlueprintMarker[];
   layout?: BlueprintLayout | null;
   showLayout?: boolean;
+  layoutOverlays?: Partial<LayoutOverlayToggles>;
   coverageAreas?: CoverageArea[];
   blindSpots?: BlindSpot[];
   routes?: { waypoints: { x: number; y: number }[]; color?: string; isSafest?: boolean }[];
@@ -61,6 +68,7 @@ export function BlueprintViewer({
   markers = [],
   layout = null,
   showLayout = true,
+  layoutOverlays,
   coverageAreas = [],
   blindSpots = [],
   routes = [],
@@ -138,6 +146,34 @@ export function BlueprintViewer({
     [activeTool, onAddMarker]
   );
 
+  const layers: LayoutOverlayToggles = {
+    walls: layoutOverlays?.walls ?? true,
+    doors: layoutOverlays?.doors ?? true,
+    windows: layoutOverlays?.windows ?? true,
+    columns: layoutOverlays?.columns ?? true,
+    railings: layoutOverlays?.railings ?? true,
+    dimensions: layoutOverlays?.dimensions ?? false,
+  };
+
+  const renderBoxes = (
+    items: BlueprintLayout["walls"],
+    keyPrefix: string,
+    className: string
+  ) =>
+    items?.map((item, i) => (
+      <div
+        key={`${keyPrefix}-${i}`}
+        className={cn("pointer-events-none absolute", className)}
+        style={{
+          left: `${item.x}%`,
+          top: `${item.y}%`,
+          width: `${item.width}%`,
+          height: `${item.height}%`,
+        }}
+        title={item.label}
+      />
+    ));
+
   const overlayContent = (
     <>
       {showLayout && layout?.blueprintBounds && (
@@ -152,38 +188,32 @@ export function BlueprintViewer({
         />
       )}
 
-      {showLayout &&
-        layout?.walls?.map((wall, i) => (
-          <div
-            key={`wall-${i}`}
-            className="pointer-events-none absolute bg-orange-500/35"
-            style={{
-              left: `${wall.x}%`,
-              top: `${wall.y}%`,
-              width: `${wall.width}%`,
-              height: `${wall.height}%`,
-            }}
-          />
-        ))}
-
-      {showLayout &&
-        layout?.rooms?.map((room) => (
-          <div
-            key={room.id}
-            className="pointer-events-none absolute border border-dashed border-emerald-400/80 bg-emerald-500/10"
-            style={{
-              left: `${room.x - room.width / 2}%`,
-              top: `${room.y - room.height / 2}%`,
-              width: `${room.width}%`,
-              height: `${room.height}%`,
-            }}
-            title={room.label}
-          >
-            <span className="absolute left-0.5 top-0.5 rounded bg-black/50 px-1 text-[8px] text-emerald-300">
-              {room.label}
-            </span>
-          </div>
-        ))}
+      {showLayout && layers.walls && renderBoxes(layout?.walls, "wall", "bg-orange-500/35")}
+      {showLayout && layers.doors && renderBoxes(
+        layout?.doors,
+        "door",
+        "border-2 border-sky-400/80 bg-sky-500/20"
+      )}
+      {showLayout && layers.windows && renderBoxes(
+        layout?.windows,
+        "window",
+        "border border-violet-400/70 bg-violet-500/15"
+      )}
+      {showLayout && layers.columns && renderBoxes(
+        layout?.columns,
+        "column",
+        "border border-amber-400/80 bg-amber-500/20"
+      )}
+      {showLayout && layers.railings && renderBoxes(
+        layout?.railings,
+        "railing",
+        "border border-pink-400/70 bg-pink-500/15"
+      )}
+      {showLayout && layers.dimensions && renderBoxes(
+        layout?.dimensions,
+        "dim",
+        "border border-dashed border-gray-400/60 bg-gray-500/10"
+      )}
 
       {showCoverage &&
         coverageAreas.map((area) => (
@@ -244,7 +274,7 @@ export function BlueprintViewer({
       ))}
 
       {markers.map((marker) => {
-        const Icon = markerIcons[marker.type];
+        const Icon = resolveMarkerIcon(marker.type);
         return (
           <Tooltip key={marker.id}>
             <TooltipTrigger asChild>
@@ -256,7 +286,7 @@ export function BlueprintViewer({
                 onMouseLeave={() => setHoveredMarker(null)}
                 className={cn(
                   "absolute z-10 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full shadow-lg",
-                  markerColors[marker.type],
+                  resolveMarkerColor(marker.type),
                   hoveredMarker === marker.id && "ring-2 ring-white/50"
                 )}
                 style={{ left: `${marker.x}%`, top: `${marker.y}%` }}

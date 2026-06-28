@@ -141,6 +141,19 @@ def extract_embedding_from_person_crop(
     h_pct: float,
 ) -> np.ndarray | None:
     """Try to find a face inside a YOLO person bounding box (head / upper torso)."""
+    crop, face = _crop_person_head_region(frame_bgr, x_pct, y_pct, w_pct, h_pct)
+    if crop is None or face is None:
+        return None
+    return extract_embedding(crop, face)
+
+
+def _crop_person_head_region(
+    frame_bgr: np.ndarray,
+    x_pct: float,
+    y_pct: float,
+    w_pct: float,
+    h_pct: float,
+) -> tuple[np.ndarray | None, np.ndarray | None]:
     fh, fw = frame_bgr.shape[:2]
     pad_x = w_pct * 0.1
     head_h = h_pct * 0.65
@@ -151,14 +164,41 @@ def extract_embedding_from_person_crop(
 
     crop = frame_bgr[y1:y2, x1:x2]
     if crop.size == 0 or crop.shape[0] < 40 or crop.shape[1] < 40:
-        return None
+        return None, None
 
     face = _largest_face(detect_faces(crop))
-    if face is None:
+    return crop, face
+
+
+def extract_face_from_person_crop(
+    frame_bgr: np.ndarray,
+    x_pct: float,
+    y_pct: float,
+    w_pct: float,
+    h_pct: float,
+) -> tuple[np.ndarray, str] | None:
+    """Extract embedding and a JPEG data-URL portrait from a person bbox."""
+    crop, face = _crop_person_head_region(frame_bgr, x_pct, y_pct, w_pct, h_pct)
+    if crop is None or face is None:
         return None
 
-    # Map face coords back to full crop for alignCrop on crop image
-    return extract_embedding(crop, face)
+    embedding = extract_embedding(crop, face)
+    fx, fy, fw, fh = (int(face[i]) for i in range(4))
+    pad = max(4, int(min(fw, fh) * 0.15))
+    cx1 = max(0, fx - pad)
+    cy1 = max(0, fy - pad)
+    cx2 = min(crop.shape[1], fx + fw + pad)
+    cy2 = min(crop.shape[0], fy + fh + pad)
+    face_img = crop[cy1:cy2, cx1:cx2]
+    if face_img.size == 0:
+        face_img = crop
+
+    ok, buf = cv2.imencode(".jpg", face_img, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+    if not ok:
+        return embedding, ""
+
+    b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+    return embedding, f"data:image/jpeg;base64,{b64}"
 
 
 def match_score(embedding_a: np.ndarray, embedding_b: np.ndarray) -> float:

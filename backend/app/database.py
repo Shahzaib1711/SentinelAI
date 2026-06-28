@@ -36,14 +36,14 @@ def _parse_database_url(url: str) -> tuple[str, dict]:
     clean_query = urlencode([(k, v[0]) for k, v in query.items()])
     clean_url = urlunparse(parsed._replace(query=clean_query))
 
-    connect_args: dict = {}
+    connect_args: dict = {"timeout": 15, "command_timeout": 60}
     if sslmode and sslmode != "disable":
         connect_args["ssl"] = True
 
     return clean_url, connect_args
 
 
-_db_url, _connect_args = _parse_database_url(settings.database_url)
+_db_url, _connect_args = _parse_database_url(settings.database_url or "")
 
 engine = create_async_engine(
     _db_url,
@@ -51,6 +51,7 @@ engine = create_async_engine(
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=2,
+    pool_timeout=15,
     connect_args=_connect_args,
 )
 

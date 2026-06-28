@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.models import Incident, IncidentStatus
+from app.models.models import Incident, IncidentStatus, ThreatLevel
 from app.services.mappers import map_incident
 
 router = APIRouter(prefix="/api/v1/incidents", tags=["incidents"])
@@ -31,6 +31,12 @@ async def update_incident(incident_id: str, body: dict, db: AsyncSession = Depen
         incident.resolution = body["resolution"]
     if "assignedTo" in body:
         incident.assignedTo = body["assignedTo"]
+    if "description" in body and body["description"]:
+        incident.description = body["description"]
+    if "location" in body and body["location"]:
+        incident.location = body["location"]
+    if "threatLevel" in body and body["threatLevel"]:
+        incident.threatLevel = ThreatLevel(str(body["threatLevel"]).lower())
 
     await db.commit()
     await db.refresh(incident)

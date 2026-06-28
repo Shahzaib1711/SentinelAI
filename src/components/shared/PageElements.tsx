@@ -17,32 +17,6 @@ export function LoadingState({ message = "Loading..." }: { message?: string }) {
   );
 }
 
-interface EmptyStateProps {
-  icon: React.ReactNode;
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
-}
-
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/60 py-16"
-    >
-      <div className="mb-4 text-muted-foreground/40">{icon}</div>
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
-      {description && (
-        <p className="mt-1 max-w-sm text-center text-xs text-muted-foreground/70">
-          {description}
-        </p>
-      )}
-      {action && <div className="mt-4">{action}</div>}
-    </motion.div>
-  );
-}
-
 export function PageHeader({
   title,
   description,

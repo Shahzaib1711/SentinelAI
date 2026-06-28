@@ -4,8 +4,6 @@ import type {
   BlindSpot,
   BlueprintMarker,
   Camera,
-  CoverageArea,
-  Detection,
   Incident,
   Recommendation,
   RiskZone,
@@ -153,8 +151,6 @@ export const blueprintMarkers: BlueprintMarker[] = [
   { id: "x2", type: "exit", x: 5, y: 90, label: "Loading Dock Exit" },
   { id: "g1", type: "guard", x: 50, y: 10, label: "Guard Post A" },
   { id: "g2", type: "guard", x: 70, y: 70, label: "Guard Post B" },
-  { id: "r1", type: "restricted", x: 65, y: 35, label: "VIP Lounge" },
-  { id: "r2", type: "restricted", x: 20, y: 75, label: "Server Room" },
   {
     id: "v1",
     type: "vip-route",
@@ -162,15 +158,6 @@ export const blueprintMarkers: BlueprintMarker[] = [
     y: 30,
     label: "VIP Route Alpha",
   },
-];
-
-export const coverageAreas: CoverageArea[] = [
-  { id: "c1", cameraId: "CAM-01", x: 15, y: 20, radius: 18, angle: 90 },
-  { id: "c2", cameraId: "CAM-02", x: 45, y: 15, radius: 20, angle: 120 },
-  { id: "c3", cameraId: "CAM-03", x: 75, y: 25, radius: 16, angle: 180 },
-  { id: "c4", cameraId: "CAM-04", x: 30, y: 55, radius: 22, angle: 270 },
-  { id: "c5", cameraId: "CAM-05", x: 60, y: 60, radius: 18, angle: 45 },
-  { id: "c6", cameraId: "CAM-06", x: 85, y: 50, radius: 15, angle: 225 },
 ];
 
 export const blindSpots: BlindSpot[] = [
@@ -284,15 +271,6 @@ export const routes: Route[] = [
   },
 ];
 
-export const locationOptions = [
-  { value: "main-entrance", label: "Main Entrance" },
-  { value: "vip-lounge", label: "VIP Lounge" },
-  { value: "conference-hall", label: "Conference Hall" },
-  { value: "parking-a", label: "Parking Area A" },
-  { value: "emergency-exit", label: "Emergency Exit" },
-  { value: "loading-dock", label: "Loading Dock" },
-];
-
 export const cameras: Camera[] = [
   { id: "CAM-01", name: "Main Entrance", location: "North Gate", status: "online", coverage: 95, useWebRTC: true },
   { id: "CAM-02", name: "Lobby Overview", location: "Central Lobby", status: "online", coverage: 88, useWebRTC: true },
@@ -303,14 +281,6 @@ export const cameras: Camera[] = [
   { id: "CAM-07", name: "Loading Dock", location: "Rear Exterior", status: "offline", coverage: 0 },
   { id: "CAM-08", name: "Emergency Exit East", location: "East Corridor", status: "maintenance", coverage: 0 },
   { id: "CAM-09", name: "Perimeter North", location: "Fence Line N", status: "online", coverage: 82 },
-];
-
-export const liveDetections: Detection[] = [
-  { id: "d1", type: "person", label: "Person #12", confidence: 97, cameraId: "CAM-01", x: 35, y: 45 },
-  { id: "d2", type: "vehicle", label: "Vehicle #3", confidence: 94, cameraId: "CAM-04", x: 60, y: 55 },
-  { id: "d3", type: "bag", label: "Bag #5", confidence: 89, cameraId: "CAM-04", x: 72, y: 38 },
-  { id: "d4", type: "person", label: "Person #18", confidence: 96, cameraId: "CAM-02", x: 48, y: 62 },
-  { id: "d5", type: "animal", label: "Animal #1", confidence: 78, cameraId: "CAM-09", x: 25, y: 30 },
 ];
 
 export const threatTimeline: TimelineEvent[] = [
@@ -367,25 +337,6 @@ export const riskZones: RiskZone[] = [
   { id: "z6", name: "Loading Dock", riskLevel: "high", riskScore: 71, incidents: 9, coverage: 58 },
   { id: "z7", name: "Service Entrance", riskLevel: "medium", riskScore: 48, incidents: 5, coverage: 78 },
   { id: "z8", name: "Perimeter North", riskLevel: "low", riskScore: 22, incidents: 1, coverage: 82 },
-];
-
-export const threatBreakdown = [
-  { type: "Unauthorized Access", count: 14, color: "#ef4444" },
-  { type: "Suspicious Objects", count: 8, color: "#f97316" },
-  { type: "Crowd Anomalies", count: 12, color: "#eab308" },
-  { type: "Vehicle Incidents", count: 6, color: "#3b82f6" },
-  { type: "Perimeter Breaches", count: 4, color: "#06b6d4" },
-  { type: "System Alerts", count: 9, color: "#8b5cf6" },
-];
-
-export const threatTrendWeekly = [
-  { day: "Mon", threats: 12, resolved: 10 },
-  { day: "Tue", threats: 18, resolved: 15 },
-  { day: "Wed", threats: 8, resolved: 8 },
-  { day: "Thu", threats: 22, resolved: 18 },
-  { day: "Fri", threats: 15, resolved: 12 },
-  { day: "Sat", threats: 28, resolved: 22 },
-  { day: "Sun", threats: 20, resolved: 17 },
 ];
 
 export const incidents: Incident[] = [

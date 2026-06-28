@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Ban,
   Camera,
   DoorOpen,
   FileImage,
@@ -21,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { blueprintApi } from "@/lib/api/blueprint";
+import { useEvent } from "@/contexts/EventContext";
+import { DEFAULT_FLOOR_PLAN_LABELS } from "@/lib/floor-plan-labels";
 import { cn } from "@/lib/utils";
 import type { BlueprintLayout, BlueprintMarker, MarkerType } from "@/types";
 
@@ -29,7 +30,6 @@ const tools: { type: MarkerType; label: string; icon: React.ElementType; color: 
   { type: "entrance", label: "Add Entrance", icon: DoorOpen, color: "text-green-400" },
   { type: "exit", label: "Add Exit", icon: LogOut, color: "text-blue-400" },
   { type: "guard", label: "Add Guard Post", icon: Shield, color: "text-purple-400" },
-  { type: "restricted", label: "Restricted Zone", icon: Ban, color: "text-red-400" },
 ];
 
 function nextMarkerLabel(type: MarkerType, markers: BlueprintMarker[]): string {
@@ -39,6 +39,7 @@ function nextMarkerLabel(type: MarkerType, markers: BlueprintMarker[]): string {
 }
 
 export default function VenueSetupPage() {
+  const { slug } = useEvent();
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,7 +57,7 @@ export default function VenueSetupPage() {
   const loadBlueprint = useCallback(async () => {
     setError(null);
     try {
-      const res = await blueprintApi.get();
+      const res = await blueprintApi.get(slug);
       setVenueName(res.venue.name);
       setFloorLevel(res.venue.floorLevel);
       setBlueprintName(res.blueprint.name);
@@ -69,16 +70,17 @@ export default function VenueSetupPage() {
           "Cannot reach the API. Start the backend with npm run api:dev and ensure PostgreSQL is running (npm run db:push && npm run db:seed)."
         );
       } else if (msg.toLowerCase().includes("not found")) {
-        setError("Blueprint not found. Run npm run db:seed to load demo venue data.");
+        setError("No floor plan for this event yet. Upload a blueprint image below, or create a new event from Events.");
       } else {
         setError(msg);
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [slug]);
 
   useEffect(() => {
+    setLoading(true);
     void loadBlueprint();
   }, [loadBlueprint]);
 
@@ -88,12 +90,15 @@ export default function VenueSetupPage() {
       setError(null);
       try {
         const label = nextMarkerLabel(marker.type, markers);
-        const res = await blueprintApi.addMarker({
-          type: marker.type,
-          x: marker.x,
-          y: marker.y,
-          label,
-        });
+        const res = await blueprintApi.addMarker(
+          {
+            type: marker.type,
+            x: marker.x,
+            y: marker.y,
+            label,
+          },
+          slug
+        );
         setMarkers((prev) => [...prev, res.marker]);
         setActiveTool(null);
       } catch (e) {
@@ -102,46 +107,63 @@ export default function VenueSetupPage() {
         setSaving(false);
       }
     },
-    [markers]
+    [markers, slug]
   );
 
-  const runAutoDetect = useCallback(async (storageUrl?: string) => {
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await blueprintApi.autoDetect(true, storageUrl);
-      setMarkers(res.markers);
-      setLayout(res.layout ?? null);
+  const runAutoDetect = useCallback(
+    async (storageUrl?: string) => {
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await blueprintApi.autoDetect(
+          {
+            replace: true,
+            storageUrl,
+            confidence: 40,
+            labels: [...DEFAULT_FLOOR_PLAN_LABELS],
+          },
+          slug
+        );
+        setMarkers(res.markers);
+        setLayout(res.layout ?? null);
       const walls =
         typeof res.summary?.wallCount === "number" ? res.summary.wallCount : res.layout?.walls?.length ?? 0;
-      const rooms =
-        typeof res.summary?.roomCount === "number" ? res.summary.roomCount : res.layout?.rooms?.length ?? 0;
       const entrances = res.markers.filter((m) => m.type === "entrance").length;
+      const doors =
+        typeof res.summary?.doorCount === "number"
+          ? res.summary.doorCount
+          : res.layout?.doors?.length ?? 0;
       const method =
         typeof res.summary?.method === "string"
-          ? res.summary.method.includes("ml_yolo")
-            ? "ML"
-            : "OpenCV"
+          ? res.summary.method === "fused_ml"
+            ? "Fused ML"
+            : res.summary.method.includes("ml_yolo")
+              ? "ML"
+              : res.summary.mlRejected
+                ? "OpenCV (ML skipped — poor fit)"
+                : "OpenCV"
           : "auto";
       const hint =
         typeof res.summary?.hint === "string" && method === "OpenCV"
           ? ` ${res.summary.hint}`
           : "";
       setDetectSummary(
-        `Detected ${walls} walls, ${rooms} rooms, ${entrances} entrance(s) via ${method} — add cameras and guards manually${hint}`
+        `Detected ${walls} walls, ${doors} doors, ${entrances} door icon(s) via ${method} — add cameras and guards manually${hint}`
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Auto-detection failed");
     } finally {
       setSaving(false);
     }
-  }, []);
+  },
+    [slug]
+  );
 
   const handleDeleteMarker = async (markerId: string) => {
     setSaving(true);
     setError(null);
     try {
-      await blueprintApi.deleteMarker(markerId);
+      await blueprintApi.deleteMarker(markerId, slug);
       setMarkers((prev) => prev.filter((m) => m.id !== markerId));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete marker");
@@ -170,11 +192,14 @@ export default function VenueSetupPage() {
         reader.readAsDataURL(file);
       });
 
-      await blueprintApi.updateStorage({
-        storageUrl: dataUrl,
-        name: `${type} — ${file.name}`,
-        type: type.toLowerCase().replace(" ", "_"),
-      });
+      await blueprintApi.updateStorage(
+        {
+          storageUrl: dataUrl,
+          name: `${type} — ${file.name}`,
+          type: type.toLowerCase().replace(" ", "_"),
+        },
+        slug
+      );
       setImageUrl(dataUrl);
       setBlueprintName(`${type} — ${file.name}`);
       await runAutoDetect(dataUrl);
@@ -200,7 +225,7 @@ export default function VenueSetupPage() {
     >
       <PageHeader
         title="Blueprint & Venue Configuration"
-        description="Upload a floor plan — ML detects walls and splits rooms from layout. ROOM-01 labels are geometric zones (text on the drawing is not read yet)."
+        description="Upload a floor plan for the event. Doors are auto-detected on upload — add cameras and guards manually."
         action={
           <Button
             size="sm"
@@ -336,12 +361,14 @@ export default function VenueSetupPage() {
                   <span className="font-mono text-cyan-400">{markers.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Rooms (ML)</span>
-                  <span className="font-mono text-emerald-400">{layout?.rooms?.length ?? 0}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-muted-foreground">Walls (ML)</span>
                   <span className="font-mono text-orange-400">{layout?.walls?.length ?? 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Doors (icons)</span>
+                  <span className="font-mono text-sky-400">
+                    {markers.filter((m) => m.type === "entrance").length}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cameras</span>

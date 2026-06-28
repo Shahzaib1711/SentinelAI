@@ -1,4 +1,4 @@
-import { DEFAULT_EVENT_SLUG } from "@/lib/services/events";
+import { getActiveEventSlug } from "@/lib/services/events";
 
 const BASE = "/api/v1";
 
@@ -13,6 +13,16 @@ export interface EnrolledPerson {
   active: boolean;
   enrolled: boolean;
   createdAt: string | null;
+}
+
+export interface DetectedPerson {
+  id: string;
+  label: string;
+  photoUrl: string | null;
+  cameraId: string | null;
+  sightingCount: number;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
 }
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -38,8 +48,54 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface BulkEnrollResult {
+  name: string;
+  row: number;
+  status: "ok" | "error";
+  personId?: string;
+  error?: string;
+}
+
+export interface BulkEnrollSummary {
+  id: string;
+  name: string;
+  designation: string;
+  role: EnrolledRole;
+  enrolled: boolean;
+}
+
+export interface BulkEnrollResponse {
+  ok: boolean;
+  parsed: number;
+  enrolled: number;
+  failed: number;
+  results: BulkEnrollResult[];
+  personnel: BulkEnrollSummary[];
+}
+
+async function fetchMultipart<T>(path: string, formData: FormData): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error(
+      "Could not reach the API during bulk import. Ensure npm run api:dev is running, then retry."
+    );
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = (body as { detail?: string }).detail;
+    throw new Error(detail ?? `Bulk import failed (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export const enrollmentApi = {
-  list: (slug = DEFAULT_EVENT_SLUG) =>
+  list: (slug = getActiveEventSlug()) =>
     fetchJson<{ personnel: EnrolledPerson[] }>(
       `${BASE}/events/${slug}/personnel/enrolled`
     ),
@@ -51,7 +107,7 @@ export const enrollmentApi = {
       role: EnrolledRole;
       photoUrl: string;
     },
-    slug = DEFAULT_EVENT_SLUG
+    slug = getActiveEventSlug()
   ) =>
     fetchJson<{ ok: boolean; person: EnrolledPerson }>(
       `${BASE}/events/${slug}/personnel/enrolled`,
@@ -61,9 +117,27 @@ export const enrollmentApi = {
       }
     ),
 
-  remove: (personId: string, slug = DEFAULT_EVENT_SLUG) =>
+  bulkEnroll: (file: File, slug = getActiveEventSlug()) => {
+    const form = new FormData();
+    form.append("file", file);
+    // /roster-upload avoids next.config /api/* rewrite (prevents ECONNRESET on large files)
+    return fetchMultipart<BulkEnrollResponse>(`/roster-upload/${slug}`, form);
+  },
+
+  remove: (personId: string, slug = getActiveEventSlug()) =>
     fetchJson<{ ok: boolean }>(
       `${BASE}/events/${slug}/personnel/enrolled/${personId}`,
+      { method: "DELETE" }
+    ),
+
+  listDetected: (slug = getActiveEventSlug()) =>
+    fetchJson<{ detected: DetectedPerson[] }>(
+      `${BASE}/events/${slug}/personnel/detected`
+    ),
+
+  removeDetected: (personId: string, slug = getActiveEventSlug()) =>
+    fetchJson<{ ok: boolean }>(
+      `${BASE}/events/${slug}/personnel/detected/${personId}`,
       { method: "DELETE" }
     ),
 };

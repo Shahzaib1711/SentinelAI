@@ -27,7 +27,6 @@ enum MarkerType {
   entrance
   exit
   guard
-  restricted
   vip_route
 }
 
@@ -59,13 +58,12 @@ enum PersonnelRole {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  firebaseUid String   @unique
-  email       String   @unique
-  name        String
-  role        UserRole @default(operator)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(operator)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model Event {
@@ -94,6 +92,7 @@ model Event {
   routes      Route[]
   recommendations Recommendation[]
   enrolledPersonnel EnrolledPerson[]
+  detectedPersons   DetectedPerson[]
 }
 
 model EnrolledPerson {
@@ -108,6 +107,21 @@ model EnrolledPerson {
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @default(now()) @updatedAt
+}
+
+model DetectedPerson {
+  id            String   @id @default(cuid())
+  eventId       String
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label         String
+  photoUrl      String?
+  embeddingJson Json
+  cameraId      String?
+  sightingCount Int      @default(1)
+  firstSeenAt   DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 }
 
 model Venue {
@@ -129,7 +143,6 @@ model Blueprint {
   name         String
   type         String   @default("floor_plan")
   storageUrl   String?
-  firebasePath String?
   coveragePct  Int      @default(0)
   vulnerabilityScore Int @default(0)
   createdAt    DateTime @default(now())

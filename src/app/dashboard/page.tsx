@@ -36,7 +36,6 @@ export default function DashboardPage() {
   return (
     <AppLayout
       title="Command Dashboard"
-      subtitle="Global Security Summit 2026 · Metropolitan Convention Center"
     >
       <PageHeader
         title="Security Operations Dashboard"
