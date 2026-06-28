@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CameraCard, CameraFeedLightbox } from "@/components/shared/CameraCard";
 import { CameraFeedLinks } from "@/components/shared/CameraFeedLinks";
 import { PersonnelFloorMap } from "@/components/shared/PersonnelFloorMap";
+import { useCameraRelayRooms } from "@/hooks/useCameraRelayRooms";
 import { useLivePersonnel } from "@/hooks/useLivePersonnel";
-import { useMultiCameraRelayDetections } from "@/hooks/useMultiCameraRelayDetections";
 import { AlertList } from "@/components/shared/AlertCard";
 import { LiveThreatIndicator } from "@/components/shared/ThreatCard";
 import { PageHeader, LoadingState } from "@/components/shared/PageElements";
@@ -25,6 +25,18 @@ import {
 import type { Alert, Camera, ThreatLevel } from "@/types";
 import { cn, getThreatBgColor, getThreatColor, getThreatDotColor } from "@/lib/utils";
 
+const CAMERA_STATUS_ORDER: Record<Camera["status"], number> = {
+  online: 0,
+  maintenance: 1,
+  offline: 2,
+};
+
+function sortCamerasForFeed(list: Camera[]): Camera[] {
+  return [...list].sort(
+    (a, b) => CAMERA_STATUS_ORDER[a.status] - CAMERA_STATUS_ORDER[b.status]
+  );
+}
+
 export default function LiveMonitoringPage() {
   const { slug } = useEvent();
   const [cameras, setCameras] = useState<Camera[]>(mockCameras);
@@ -37,10 +49,16 @@ export default function LiveMonitoringPage() {
   const [selectedCameraIds, setSelectedCameraIds] = useState<string[]>([]);
 
   const MAX_COMPARE = 4;
-  const feedCameras = cameras.filter((c) => c.status === "online").slice(0, 6);
-  const feedCameraIds = feedCameras.map((c) => c.id);
-  const relayDetectionsByCamera = useMultiCameraRelayDetections(feedCameraIds);
-  const { personnel, summary: personnelSummary } = useLivePersonnel(undefined, slug);
+  const feedCameras = useMemo(
+    () => sortCamerasForFeed(cameras).slice(0, 6),
+    [cameras]
+  );
+  const feedCameraIds = useMemo(
+    () => feedCameras.map((c) => c.id),
+    [feedCameras]
+  );
+  const relayRooms = useCameraRelayRooms(feedCameraIds);
+  const { personnel, summary: personnelSummary } = useLivePersonnel(2000, slug);
 
   const toggleCompareMode = () => {
     setCompareMode((on) => {
@@ -85,7 +103,7 @@ export default function LiveMonitoringPage() {
           api.alerts(slug, true),
           api.dashboard(slug),
         ]);
-        setCameras(camRes.cameras);
+        setCameras(camRes.cameras.length > 0 ? camRes.cameras : mockCameras);
         setAlerts(alertRes.alerts);
         setThreatLevel(dashRes.kpis.threatLevel as ThreatLevel);
         setDataSource("api");
@@ -177,6 +195,16 @@ export default function LiveMonitoringPage() {
               </div>
             </CardHeader>
             <CardContent>
+              {feedCameras.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/60 py-16 text-center">
+                  <p className="text-sm font-medium text-muted-foreground">No cameras configured</p>
+                  <p className="mt-2 max-w-sm text-xs text-muted-foreground/80">
+                    Select the seeded event (summit-2026) or run{" "}
+                    <code className="text-cyan-400">npm run db:seed</code> to load default camera
+                    slots.
+                  </p>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {feedCameras.map((camera, i) => (
                   <motion.div
@@ -191,12 +219,13 @@ export default function LiveMonitoringPage() {
                       showBroadcastLink
                       compareMode={compareMode}
                       isSelected={selectedCameraIds.includes(camera.id)}
-                      detections={relayDetectionsByCamera[camera.id] ?? []}
+                      relay={relayRooms[camera.id]}
                       onFeedClick={() => handleFeedClick(camera)}
                     />
                   </motion.div>
                 ))}
               </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -260,7 +289,7 @@ export default function LiveMonitoringPage() {
 
       <CameraFeedLightbox
         cameras={expandedCameras}
-        getDetections={(cameraId) => relayDetectionsByCamera[cameraId] ?? []}
+        getRelay={(cameraId) => relayRooms[cameraId]}
         onClose={() => setExpandedCameras([])}
         onRemoveCamera={removeExpandedCamera}
       />

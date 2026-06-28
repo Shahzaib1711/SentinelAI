@@ -1,20 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { getBroadcastPath } from "@/lib/camera-urls";
 import { cn } from "@/lib/utils";
 import { useFrameRelayView } from "@/hooks/useFrameRelayView";
+import type { CameraRelayState } from "@/hooks/useCameraRelayRooms";
 import { DetectionOverlay } from "@/components/shared/DetectionOverlay";
 
 interface WebRTCViewerProps {
   cameraId: string;
   className?: string;
+  /** When provided, skips internal polling (use page-level useCameraRelayRooms). */
+  relay?: CameraRelayState;
 }
 
 /** Live phone feed via server-relayed frames (reliable through ngrok). */
-export function WebRTCViewer({ cameraId, className }: WebRTCViewerProps) {
-  const { state, frameSrc, detections } = useFrameRelayView(cameraId);
+export function WebRTCViewer({ cameraId, className, relay }: WebRTCViewerProps) {
+  const internal = useFrameRelayView(cameraId, !relay);
+  const { state, frameSrc, detections } = relay ?? internal;
 
   return (
     <div className={cn("relative h-full w-full bg-black", className)}>

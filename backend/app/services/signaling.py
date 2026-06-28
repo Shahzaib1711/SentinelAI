@@ -2,7 +2,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
-STALE_MS = 15_000
+# Broadcaster must send frames/heartbeats within this window to stay "online".
+STALE_MS = 30_000
 
 
 @dataclass
@@ -48,13 +49,8 @@ def reset_room(camera_id: str, session_id: str, role: str) -> None:
 
 
 def room_state(camera_id: str, now: int) -> dict[str, Any]:
+    """Return relay room snapshot. Read-only — do not mutate sessions on GET."""
     room = get_room(camera_id)
-    if not _is_online(room.broadcaster_last_seen, now):
-        room.broadcaster_session_id = None
-    if not _is_online(room.viewer_last_seen, now):
-        room.viewer_session_id = None
-        room.answer = None
-        room.viewer_ice = []
 
     return {
         "broadcasterOnline": _is_online(room.broadcaster_last_seen, now),

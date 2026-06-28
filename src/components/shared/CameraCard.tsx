@@ -12,12 +12,14 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { WebRTCViewer } from "@/components/shared/WebRTCViewer";
 import { DetectionOverlay } from "@/components/shared/DetectionOverlay";
+import type { CameraRelayState } from "@/hooks/useCameraRelayRooms";
 import type { Detection } from "@/types";
 
 interface CameraCardProps {
   camera: CameraType;
   showFeed?: boolean;
   detections?: Detection[];
+  relay?: CameraRelayState;
   showBroadcastLink?: boolean;
   isSelected?: boolean;
   compareMode?: boolean;
@@ -27,7 +29,7 @@ interface CameraCardProps {
 
 interface CameraFeedLightboxProps {
   cameras: CameraType[];
-  getDetections: (cameraId: string) => Detection[];
+  getRelay?: (cameraId: string) => CameraRelayState | undefined;
   onClose: () => void;
   onRemoveCamera?: (cameraId: string) => void;
 }
@@ -41,10 +43,12 @@ const statusConfig = {
 function CameraFeedContent({
   camera,
   detections = [],
+  relay,
   className,
 }: {
   camera: CameraType;
   detections?: Detection[];
+  relay?: CameraRelayState;
   className?: string;
 }) {
   return (
@@ -53,7 +57,7 @@ function CameraFeedContent({
       {camera.status === "online" ? (
         <>
           {camera.useWebRTC ? (
-            <WebRTCViewer cameraId={camera.id} className="absolute inset-0 z-0" />
+            <WebRTCViewer cameraId={camera.id} relay={relay} className="absolute inset-0 z-0" />
           ) : (
             <>
               <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
@@ -93,7 +97,7 @@ function expandedGridCols(count: number): string {
 
 export function CameraFeedLightbox({
   cameras,
-  getDetections,
+  getRelay,
   onClose,
   onRemoveCamera,
 }: CameraFeedLightboxProps) {
@@ -163,11 +167,17 @@ export function CameraFeedLightbox({
               <div className={cn("grid gap-px bg-border/40", expandedGridCols(cameras.length))}>
                 {cameras.map((camera) => {
                   const status = statusConfig[camera.status];
-                  const detections = camera.useWebRTC ? [] : getDetections(camera.id);
+                  const relay = getRelay?.(camera.id);
+                  const detections = relay?.detections ?? [];
 
                   return (
                     <div key={camera.id} className="flex flex-col bg-card">
-                      <CameraFeedContent camera={camera} detections={detections} className="aspect-video" />
+                      <CameraFeedContent
+                        camera={camera}
+                        detections={detections}
+                        relay={relay}
+                        className="aspect-video"
+                      />
                       <div className="flex items-center justify-between gap-2 border-t border-border/60 p-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -210,6 +220,7 @@ export function CameraCard({
   camera,
   showFeed = false,
   detections = [],
+  relay,
   showBroadcastLink = false,
   isSelected = false,
   compareMode = false,
@@ -240,7 +251,11 @@ export function CameraCard({
           onClick={onFeedClick}
           disabled={!onFeedClick}
         >
-          <CameraFeedContent camera={camera} detections={camera.useWebRTC ? [] : detections} />
+          <CameraFeedContent
+            camera={camera}
+            detections={camera.useWebRTC ? (relay?.detections ?? []) : detections}
+            relay={relay}
+          />
           {onFeedClick && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/0 transition-colors group-hover/feed:bg-black/20">
               <span className="rounded-md bg-black/60 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white opacity-0 transition-opacity group-hover/feed:opacity-100">

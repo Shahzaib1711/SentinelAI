@@ -24,6 +24,7 @@ from app.models.models import (
 from app.services.mappers import map_alert, map_camera, map_incident, map_marker_type, to_db_marker_type
 from app.services.blueprint_analyzer import analyze_blueprint_image
 from app.services.coverage_engine import analyze_coverage
+from app.services.default_cameras import DEFAULT_CAMERAS, ensure_default_cameras
 from app.services.security_planner import build_security_plan
 from app.services.threat_intelligence import build_threat_intelligence
 from app.services.personnel_store import get_all_personnel, get_personnel_summary
@@ -190,6 +191,8 @@ async def create_event(body: CreateEventBody, db: AsyncSession = Depends(get_db)
     db.add(event)
     db.add(venue)
     db.add(blueprint)
+    for spec in DEFAULT_CAMERAS:
+        db.add(Camera(eventId=event_id, **spec))
     await db.commit()
 
     try:
@@ -296,6 +299,8 @@ async def get_cameras(slug: str, db: AsyncSession = Depends(get_db)):
         select(Camera).where(Camera.eventId == event.id).order_by(Camera.id)
     )
     cameras = result.scalars().all()
+    if not cameras:
+        cameras = await ensure_default_cameras(db, event.id)
     return {"cameras": [map_camera(c) for c in cameras]}
 
 

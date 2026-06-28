@@ -152,8 +152,17 @@ async def post_webrtc_signal(camera_id: str, body: dict):
         return {"ok": True}
 
     if action == "frame":
-        if room.broadcaster_session_id == body.get("sessionId") and isinstance(body.get("frame"), str):
-            frame = body["frame"]
+        session_id = body.get("sessionId")
+        frame = body.get("frame")
+        if isinstance(frame, str) and session_id:
+            # Recover session if a stale GET cleared broadcaster_session_id but phone still sends.
+            if room.broadcaster_session_id is None:
+                room.broadcaster_session_id = session_id
+            elif room.broadcaster_session_id != session_id:
+                if now - room.broadcaster_last_seen < 15_000:
+                    raise HTTPException(status_code=409, detail="Broadcaster already active")
+                room.broadcaster_session_id = session_id
+
             room.latest_frame = frame
             room.frame_updated_at = now
             room.broadcaster_last_seen = now
