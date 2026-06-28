@@ -36,12 +36,39 @@ from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/v1/events", tags=["events"])
 
-SECURITY_SUMMARIES = [
-    {"title": "Perimeter Status", "value": "Secure", "change": 2, "icon": "shield"},
-    {"title": "VIP Route Clear", "value": "Active", "change": 0, "icon": "route"},
-    {"title": "Guard Deployment", "value": "18/20", "change": -1, "icon": "users"},
-    {"title": "Response Time", "value": "2.4 min", "change": -12, "icon": "clock"},
-]
+
+def _security_summaries_for_event(
+    event: Event, cameras_online: int, total_cameras: int
+) -> list[dict]:
+    offline = max(0, total_cameras - cameras_online)
+    perimeter = "Secure" if offline == 0 else f"{offline} cam gap(s)"
+    vip_value = "Active" if event.vipCount > 0 else "Standby"
+    personnel = event.securityPersonnel or 0
+    guard_value = f"{personnel} deployed" if personnel else "Not set"
+    score_delta = event.securityScore - 80
+    response = f"{max(1.0, 4.5 - score_delta * 0.05):.1f} min"
+
+    return [
+        {
+            "title": "Perimeter Status",
+            "value": perimeter,
+            "change": 2 if offline == 0 else -offline,
+            "icon": "shield",
+        },
+        {"title": "VIP Route Clear", "value": vip_value, "change": 0, "icon": "route"},
+        {
+            "title": "Guard Deployment",
+            "value": guard_value,
+            "change": min(0, personnel - 20) if personnel else 0,
+            "icon": "users",
+        },
+        {
+            "title": "Response Time",
+            "value": response,
+            "change": score_delta,
+            "icon": "clock",
+        },
+    ]
 
 
 def _coerce_threat_level(value: str | ThreatLevel) -> ThreatLevel:
@@ -288,7 +315,9 @@ async def get_dashboard(slug: str, db: AsyncSession = Depends(get_db)):
             for t in event.activeThreats
         ],
         "recentAlerts": [map_alert(a) for a in sorted(event.alerts, key=lambda x: x.timestamp, reverse=True)[:5]],
-        "securitySummaries": SECURITY_SUMMARIES,
+        "securitySummaries": _security_summaries_for_event(
+            event, cameras_online, len(event.cameras)
+        ),
     }
 
 
